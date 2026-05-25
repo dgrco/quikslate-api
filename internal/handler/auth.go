@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/dgrco/autoflow/internal/domain"
+	"github.com/dgrco/autoflow/internal/response"
 	"github.com/dgrco/autoflow/internal/service"
 	"github.com/go-chi/chi/v5"
 )
@@ -58,7 +59,7 @@ type TokenResponse struct {
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req registerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, ERR_INVALID_REQ_BODY, http.StatusBadRequest)
+		response.WriteError(w, ERR_INVALID_REQ_BODY, http.StatusBadRequest)
 		return
 	}
 
@@ -67,25 +68,25 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		var validationErr *domain.ValidationError
 		switch {
 		case errors.As(err, &validationErr):
-			writeError(w, validationErr.Message, http.StatusBadRequest)
+			response.WriteError(w, validationErr.Message, http.StatusBadRequest)
 		case errors.Is(err, domain.ErrAlreadyExists):
-			writeError(w, "that email is already in use", http.StatusConflict)
+			response.WriteError(w, "that email is already in use", http.StatusConflict)
 		default:
 			// unexpected errors
 			log.Printf("register: %v", err)
-			writeError(w, ERR_INTERNAL_SERVER, http.StatusInternalServerError)
+			response.WriteError(w, ERR_INTERNAL_SERVER, http.StatusInternalServerError)
 		}
 		return
 	}
 
 	setRefreshTokenCookie(w, authResponse.RefreshToken, h.secure)
-	writeJSON(w, TokenResponse{AccessToken: authResponse.AccessToken}, http.StatusOK)
+	response.WriteJSON(w, TokenResponse{AccessToken: authResponse.AccessToken}, http.StatusOK)
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, ERR_INVALID_REQ_BODY, http.StatusBadRequest)
+		response.WriteError(w, ERR_INVALID_REQ_BODY, http.StatusBadRequest)
 		return
 	}
 
@@ -93,22 +94,22 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrInvalidCredentials):
-			writeError(w, "invalid login credentials", http.StatusUnauthorized)
+			response.WriteError(w, "invalid login credentials", http.StatusUnauthorized)
 		default:
 			log.Printf("login: %v", err)
-			writeError(w, ERR_INTERNAL_SERVER, http.StatusInternalServerError)
+			response.WriteError(w, ERR_INTERNAL_SERVER, http.StatusInternalServerError)
 		}
 		return
 	}
 
 	setRefreshTokenCookie(w, authResponse.RefreshToken, h.secure)
-	writeJSON(w, TokenResponse{AccessToken: authResponse.AccessToken}, http.StatusOK)
+	response.WriteJSON(w, TokenResponse{AccessToken: authResponse.AccessToken}, http.StatusOK)
 }
 
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("refresh_token")
 	if err != nil {
-		writeError(w, "no refresh token cookie", http.StatusBadRequest)
+		response.WriteError(w, "no refresh token cookie", http.StatusBadRequest)
 		return
 	}
 	refreshToken := cookie.Value
@@ -117,22 +118,22 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrInvalidRefreshToken):
-			writeError(w, ERR_INVALID_REFRESH_TOKEN, http.StatusUnauthorized)
+			response.WriteError(w, ERR_INVALID_REFRESH_TOKEN, http.StatusUnauthorized)
 		default:
 			log.Printf("refresh: %v", err)
-			writeError(w, ERR_INTERNAL_SERVER, http.StatusInternalServerError)
+			response.WriteError(w, ERR_INTERNAL_SERVER, http.StatusInternalServerError)
 		}
 		return
 	}
 
 	setRefreshTokenCookie(w, authResponse.RefreshToken, h.secure)
-	writeJSON(w, TokenResponse{AccessToken: authResponse.AccessToken}, http.StatusOK)
+	response.WriteJSON(w, TokenResponse{AccessToken: authResponse.AccessToken}, http.StatusOK)
 }
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("refresh_token")
 	if err != nil {
-		writeError(w, "no refresh token cookie", http.StatusBadRequest)
+		response.WriteError(w, "no refresh token cookie", http.StatusBadRequest)
 		return
 	}
 	refreshToken := cookie.Value
@@ -141,15 +142,15 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrNotFound):
-			writeError(w, ERR_INVALID_REFRESH_TOKEN, http.StatusUnauthorized)
+			response.WriteError(w, ERR_INVALID_REFRESH_TOKEN, http.StatusUnauthorized)
 		default:
 			log.Printf("logout: %v", err)
-			writeError(w, ERR_INTERNAL_SERVER, http.StatusInternalServerError)
+			response.WriteError(w, ERR_INTERNAL_SERVER, http.StatusInternalServerError)
 		}
 		return
 	}
 
-	writeJSON(w, SimpleResponse{Message: "ok"}, http.StatusOK)
+	response.WriteJSON(w, SimpleResponse{Message: "ok"}, http.StatusOK)
 }
 
 func setRefreshTokenCookie(w http.ResponseWriter, token string, secure bool) {

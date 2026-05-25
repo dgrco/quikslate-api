@@ -1,4 +1,4 @@
-package handler
+package response
 
 import (
 	"encoding/json"
@@ -9,12 +9,12 @@ type errorResponse struct {
 	Error string `json:"error"`
 }
 
-func writeJSON(w http.ResponseWriter, data any, status int) {
+func WriteJSON(w http.ResponseWriter, data any, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)
 }
 
-func writeError(w http.ResponseWriter, msg string, status int) {
-	writeJSON(w, errorResponse{Error: msg}, status)
+func WriteError(w http.ResponseWriter, msg string, status int) {
+	WriteJSON(w, errorResponse{Error: msg}, status)
 }

@@ -43,14 +43,6 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
-type refreshRequest struct {
-	RefreshToken string `json:"refresh_token"`
-}
-
-type logoutRequest struct {
-	RefreshToken string `json:"refresh_token"`
-}
-
 // Response Structures
 
 type SimpleResponse struct {
@@ -114,13 +106,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
-	var req refreshRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, ERR_INVALID_REQ_BODY, http.StatusBadRequest)
+	cookie, err := r.Cookie("refresh_token")
+	if err != nil {
+		writeError(w, "no refresh token cookie", http.StatusBadRequest)
 		return
 	}
+	refreshToken := cookie.Value
 
-	authResponse, err := h.authService.Refresh(r.Context(), req.RefreshToken)
+	authResponse, err := h.authService.Refresh(r.Context(), refreshToken)
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrInvalidRefreshToken):
@@ -137,13 +130,14 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	var req logoutRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, ERR_INVALID_REQ_BODY, http.StatusBadRequest)
+	cookie, err := r.Cookie("refresh_token")
+	if err != nil {
+		writeError(w, "no refresh token cookie", http.StatusBadRequest)
 		return
 	}
+	refreshToken := cookie.Value
 
-	err := h.authService.Logout(r.Context(), req.RefreshToken)
+	err = h.authService.Logout(r.Context(), refreshToken)
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrNotFound):

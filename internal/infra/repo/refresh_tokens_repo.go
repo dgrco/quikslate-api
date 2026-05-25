@@ -66,11 +66,11 @@ func (s *PgRepository) DeleteRefreshToken(ctx context.Context, token string) err
 	`
 
 	cmdTag, err := s.pool.Exec(ctx, query, token)
-	if cmdTag.RowsAffected() == 0 {
-		return domain.ErrNotFound
-	}
 	if err != nil {
 		return fmt.Errorf("failed to delete refresh token: %w", err)
+	}
+	if cmdTag.RowsAffected() == 0 {
+		return domain.ErrNotFound
 	}
 
 	return nil

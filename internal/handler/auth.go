@@ -8,6 +8,7 @@ import (
 
 	"github.com/dgrco/autoflow/internal/domain"
 	"github.com/dgrco/autoflow/internal/service"
+	"github.com/go-chi/chi/v5"
 )
 
 const (
@@ -165,5 +166,15 @@ func setRefreshTokenCookie(w http.ResponseWriter, token string, secure bool) {
 		SameSite: http.SameSiteLaxMode,
 		Path:     "/auth",
 		MaxAge:   30 * 24 * 60 * 60, // 30 days
+	})
+}
+
+// SetupRoutes registers the auth route group and its subroutes
+func (h *AuthHandler) SetupRoutes(r chi.Router) {
+	r.Route("/auth", func(r chi.Router) {
+		r.Post("/register", h.Register)
+		r.Post("/login", h.Login)
+		r.Post("/refresh", h.Refresh)
+		r.Post("/logout", h.Logout)
 	})
 }

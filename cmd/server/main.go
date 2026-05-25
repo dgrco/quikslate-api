@@ -10,8 +10,9 @@ import (
 	"github.com/dgrco/autoflow/internal/handler"
 	"github.com/dgrco/autoflow/internal/infra/repo"
 	"github.com/dgrco/autoflow/internal/service"
+	middleware "github.com/dgrco/autoflow/internal/middleware"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 )
 
 func main() {
@@ -35,15 +36,17 @@ func main() {
  
 	// Setup router
 	r := chi.NewRouter()
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
+	r.Use(chiMiddleware.Logger)
+	r.Use(chiMiddleware.Recoverer)
 
-	// Handlers
-	r.Route("/auth", func(r chi.Router) {
-		r.Post("/register", authHandler.Register)
-		r.Post("/login", authHandler.Login)
-		r.Post("/refresh", authHandler.Refresh)
-		r.Post("/logout", authHandler.Logout)
+	// Route Setup
+	authHandler.SetupRoutes(r)
+
+	r.Route("/protected", func(r chi.Router) {
+		r.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte("Hello world"))
+		})
 	})
 
 	// Listen

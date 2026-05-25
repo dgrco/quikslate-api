@@ -1,5 +1,7 @@
 # Authflow Backend
 
+NOTE: This will constantly be updated. Expect it to be unfinished.
+
 ## Technical Decisions
 
 ### Authentication: JWT Authentication w/ Refresh Token Rotation

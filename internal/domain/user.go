@@ -7,11 +7,14 @@ import (
 )
 
 type User struct {
-	ID        string
-	Email     string
-	Password  string // Hashed Password
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID               string
+	Email            string
+	Password         string // Hashed Password
+	InviteToken      string
+	InviteExpiresAt  time.Time
+	InviteAcceptedAt time.Time
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 // ValidateRegistrationCredentials checks for certain conditions on the email

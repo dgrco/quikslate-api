@@ -15,13 +15,22 @@ func (s *PgRepository) CreateUser(ctx context.Context, email, passwordHash strin
 	query := `
 		INSERT INTO users (email, password)
 		VALUES ($1, $2)
-		RETURNING id, email, created_at, updated_at
+		RETURNING id, email, password, 
+			invite_token, 
+			invite_expires_at, 
+			invite_accepted_at, 
+			created_at, 
+			updated_at
 	`
 
 	var u domain.User
 	err := s.pool.QueryRow(ctx, query, email, passwordHash).Scan(
 		&u.ID,
 		&u.Email,
+		&u.Password,
+		&u.InviteToken,
+		&u.InviteExpiresAt,
+		&u.InviteAcceptedAt,
 		&u.CreatedAt,
 		&u.UpdatedAt,
 	)
@@ -44,6 +53,9 @@ func (s *PgRepository) GetUserByEmail(ctx context.Context, email string) (domain
 		&u.ID,
 		&u.Email,
 		&u.Password,
+		&u.InviteToken,
+		&u.InviteExpiresAt,
+		&u.InviteAcceptedAt,
 		&u.CreatedAt,
 		&u.UpdatedAt,
 	)
@@ -69,6 +81,9 @@ func (s *PgRepository) GetUserById(ctx context.Context, id string) (domain.User,
 		&u.ID,
 		&u.Email,
 		&u.Password,
+		&u.InviteToken,
+		&u.InviteExpiresAt,
+		&u.InviteAcceptedAt,
 		&u.CreatedAt,
 		&u.UpdatedAt,
 	)

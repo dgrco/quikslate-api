@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type Business struct {
 	ID        string    `json:"id"`
@@ -10,8 +13,8 @@ type Business struct {
 }
 
 type BusinessRepository interface {
-	CreateBusiness(name string) (*Business, error)
-	GetBusinessById(id string) (*Business, error)
-	ChangeBusinessName(newName string) error
-	DeleteBusiness(id string) error
+	CreateBusiness(ctx context.Context, name string) (Business, error)
+	GetBusinessById(ctx context.Context, id string) (Business, error)
+	ChangeBusinessName(ctx context.Context, id, newName string) error
+	DeleteBusiness(ctx context.Context, id string) error
 }

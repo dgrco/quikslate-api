@@ -6,18 +6,18 @@ import (
 )
 
 type Location struct {
-	ID         string `json:"id"`
-	BusinessID string `json:"business_id"`
-	Name       string `json:"name"`
-	Address    string `json:"address"`
+	ID         string    `json:"id"`
+	BusinessID string    `json:"business_id"`
+	Name       string    `json:"name"`
+	Address    string    `json:"address"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // Update struct (can be used for partial updates -> simply don't assign a field)
 type LocationUpdate struct {
-	Name       *string
-	Address    *string
+	Name    *string
+	Address *string
 }
 
 type LocationRepository interface {

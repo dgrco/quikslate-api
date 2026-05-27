@@ -4,4 +4,5 @@ package domain
 type Repo interface {
 	UserRepository
 	RefreshTokenRepository
+	BusinessRepository
 }

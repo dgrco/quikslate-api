@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dgrco/autoflow/internal/domain"
+	"github.com/dgrco/quikslate/internal/domain"
 	"github.com/jackc/pgx/v5"
 )
 

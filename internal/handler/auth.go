@@ -6,9 +6,9 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/dgrco/autoflow/internal/domain"
-	"github.com/dgrco/autoflow/internal/response"
-	"github.com/dgrco/autoflow/internal/service"
+	"github.com/dgrco/quikslate/internal/domain"
+	"github.com/dgrco/quikslate/internal/response"
+	"github.com/dgrco/quikslate/internal/service"
 	"github.com/go-chi/chi/v5"
 )
 

@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/dgrco/autoflow/internal/ctxkeys"
-	"github.com/dgrco/autoflow/internal/response"
-	"github.com/dgrco/autoflow/pkg/auth"
+	"github.com/dgrco/quikslate/internal/ctxkeys"
+	"github.com/dgrco/quikslate/internal/response"
+	"github.com/dgrco/quikslate/pkg/auth"
 )
 
 const UserIDKey ctxkeys.StringContextKey = "userID"

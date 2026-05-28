@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dgrco/autoflow/internal/domain"
+	"github.com/dgrco/quikslate/internal/domain"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -85,7 +85,7 @@ func (r *PgRepository) GetLocationsByBusinessID(ctx context.Context, businessID 
 			&l.UpdatedAt,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan locations: %w", err)
+			return nil, fmt.Errorf("failed to scan location: %w", err)
 		}
 		locations = append(locations, l)
 	}
@@ -97,12 +97,18 @@ func (r *PgRepository) GetLocationsByBusinessID(ctx context.Context, businessID 
 	return locations, nil
 }
 
-func (r *PgRepository) UpdateLocation(ctx context.Context, id string, update domain.LocationUpdate) error {
+func (r *PgRepository) UpdateLocationById(ctx context.Context, id string, update domain.LocationUpdate) error {
 	builder := newUpdateBuilder()
-	
-	if update.Name != nil { builder.Add("name", *update.Name) }
-	if update.Address != nil { builder.Add("address", *update.Address) }
-	if builder.IsEmpty() { return nil } // nothing changed
+
+	if update.Name != nil {
+		builder.Add("name", *update.Name)
+	}
+	if update.Address != nil {
+		builder.Add("address", *update.Address)
+	}
+	if builder.IsEmpty() {
+		return nil
+	} // nothing changed
 
 	query, args := builder.Build("locations", "id", id)
 

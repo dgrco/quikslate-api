@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgrco/autoflow/internal/domain"
-	"github.com/dgrco/autoflow/pkg/auth"
+	"github.com/dgrco/quikslate/internal/domain"
+	"github.com/dgrco/quikslate/pkg/auth"
 )
 
 type AuthService struct {
@@ -107,7 +107,7 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
 }
 
 // generateTokens creates a JWT and a refresh token for a given user
-func (s *AuthService) generateTokens(ctx context.Context, userID string) (*AuthResponse, error) { 
+func (s *AuthService) generateTokens(ctx context.Context, userID string) (*AuthResponse, error) {
 	// generate JWT
 	accessToken, err := auth.GenerateJWT(userID, s.jwtSecret)
 	if err != nil {
@@ -131,7 +131,7 @@ func (s *AuthService) generateTokens(ctx context.Context, userID string) (*AuthR
 	}
 
 	return &AuthResponse{
-		AccessToken: accessToken,
+		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}, nil
 }
@@ -145,7 +145,6 @@ func generateSecureToken() (string, error) {
 	}
 	return hex.EncodeToString(bytes), nil
 }
-
 
 // hashToken computes the SHA256 sum of a token and returns a hex-encoded string
 // of length 64.

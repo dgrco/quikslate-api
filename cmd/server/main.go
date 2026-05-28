@@ -5,12 +5,12 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/dgrco/autoflow/internal/config"
-	"github.com/dgrco/autoflow/internal/database"
-	"github.com/dgrco/autoflow/internal/handler"
-	"github.com/dgrco/autoflow/internal/infra/repo"
-	"github.com/dgrco/autoflow/internal/service"
-	middleware "github.com/dgrco/autoflow/internal/middleware"
+	"github.com/dgrco/quikslate/internal/config"
+	"github.com/dgrco/quikslate/internal/database"
+	"github.com/dgrco/quikslate/internal/handler"
+	"github.com/dgrco/quikslate/internal/infra/repo"
+	middleware "github.com/dgrco/quikslate/internal/middleware"
+	"github.com/dgrco/quikslate/internal/service"
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 )
@@ -20,7 +20,7 @@ func main() {
 	cfg := config.Load()
 
 	// Connect to database
-	pool, err := database.Connect(cfg.DatabaseUrl);
+	pool, err := database.Connect(cfg.DatabaseUrl)
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
 	}
@@ -30,10 +30,10 @@ func main() {
 
 	pgRepo := repo.NewPgRepository(pool)
 
-	// Auth service/handler 
+	// Auth service/handler
 	authService := service.NewAuthService(pgRepo, cfg.JWTSecret)
 	authHandler := handler.NewAuthHandler(authService, cfg.IsSecureMode())
- 
+
 	// Setup router
 	r := chi.NewRouter()
 	r.Use(chiMiddleware.Logger)

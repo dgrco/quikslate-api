@@ -7,5 +7,5 @@ type PgRepository struct {
 }
 
 func NewPgRepository(pool *pgxpool.Pool) *PgRepository {
-	return &PgRepository{ pool }
+	return &PgRepository{pool}
 }

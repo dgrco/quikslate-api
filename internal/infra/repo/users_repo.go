@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dgrco/autoflow/internal/domain"
+	"github.com/dgrco/quikslate/internal/domain"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -43,7 +43,7 @@ func (s *PgRepository) CreateUser(ctx context.Context, email, passwordHash strin
 
 func (s *PgRepository) GetUserByEmail(ctx context.Context, email string) (domain.User, error) {
 	query := `
-		SELECT id, email, password, created_at, updated_at
+		SELECT id, email, password, invite_token, invite_expires_at, invite_accepted_at, created_at, updated_at
 		FROM users
 		WHERE email = $1
 	`
@@ -71,7 +71,7 @@ func (s *PgRepository) GetUserByEmail(ctx context.Context, email string) (domain
 
 func (s *PgRepository) GetUserById(ctx context.Context, id string) (domain.User, error) {
 	query := `
-		SELECT id, email, password, created_at, updated_at
+		SELECT id, email, password, invite_token, invite_expires_at, invite_accepted_at, created_at, updated_at
 		FROM users
 		WHERE id = $1
 	`

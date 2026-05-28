@@ -97,7 +97,7 @@ func (r *PgRepository) GetLocationsByBusinessID(ctx context.Context, businessID 
 	return locations, nil
 }
 
-func (r *PgRepository) UpdateLocationById(ctx context.Context, id string, update domain.LocationUpdate) error {
+func (r *PgRepository) UpdateLocationByID(ctx context.Context, id string, update domain.LocationUpdate) error {
 	builder := newUpdateBuilder()
 
 	if update.Name != nil {

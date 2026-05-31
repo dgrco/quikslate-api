@@ -10,4 +10,5 @@ type Repo interface {
 	ShiftRepository
 	UserRoleRepository
 	EmployeePositionRepository
+	CompositeRepository
 }

@@ -30,9 +30,9 @@ type AuthResponse struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-func (s *AuthService) Register(ctx context.Context, email, password string) (*AuthResponse, error) {
+func (s *AuthService) Register(ctx context.Context, email, password, businessName string) (*AuthResponse, error) {
 	// validate email and password
-	err := domain.ValidateRegistrationCredentials(email, password)
+	err := domain.ValidateRegistrationCredentials(email, password, businessName)
 	if err != nil {
 		return nil, err
 	}
@@ -52,14 +52,14 @@ func (s *AuthService) Register(ctx context.Context, email, password string) (*Au
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	// create user
-	user, err := s.repo.CreateUser(ctx, email, hashed)
+	// create user & business
+	user, _, err := s.repo.CreateUserWithBusiness(ctx, email, hashed, businessName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create user: %w", err)
+		return nil, fmt.Errorf("failed to create user with business: %w", err)
 	}
 
 	// generate tokens
-	return s.generateTokens(ctx, user.ID)
+	return s.generateTokens(ctx, user.Id)
 }
 
 func (s *AuthService) Login(ctx context.Context, email, password string) (*AuthResponse, error) {
@@ -75,7 +75,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*AuthR
 		return nil, domain.ErrInvalidCredentials
 	}
 
-	return s.generateTokens(ctx, user.ID)
+	return s.generateTokens(ctx, user.Id)
 }
 
 func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthResponse, error) {
@@ -98,7 +98,7 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthRe
 		return nil, fmt.Errorf("failed to rotate refresh token: %w", err)
 	}
 
-	return s.generateTokens(ctx, stored.UserID)
+	return s.generateTokens(ctx, stored.UserId)
 }
 
 func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
@@ -107,9 +107,9 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
 }
 
 // generateTokens creates a JWT and a refresh token for a given user
-func (s *AuthService) generateTokens(ctx context.Context, userID string) (*AuthResponse, error) {
+func (s *AuthService) generateTokens(ctx context.Context, userId string) (*AuthResponse, error) {
 	// generate JWT
-	accessToken, err := auth.GenerateJWT(userID, s.jwtSecret)
+	accessToken, err := auth.GenerateJWT(userId, s.jwtSecret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
@@ -125,7 +125,7 @@ func (s *AuthService) generateTokens(ctx context.Context, userID string) (*AuthR
 
 	// store hashed refresh token in database
 	expiresAt := time.Now().Add(30 * 24 * time.Hour)
-	_, err = s.repo.CreateRefreshToken(ctx, userID, hashedToken, expiresAt)
+	_, err = s.repo.CreateRefreshToken(ctx, userId, hashedToken, expiresAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store refresh token: %w", err)
 	}

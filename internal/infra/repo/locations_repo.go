@@ -9,45 +9,74 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func (r *PgRepository) CreateLocation(ctx context.Context, businessID, name, address string) (domain.Location, error) {
-	query := `
+const (
+	createLocationQuery = `
 		INSERT INTO locations (business_id, name, address)
 		VALUES ($1, $2, $3)
 		RETURNING id, business_id, name, address, created_at, updated_at
 	`
-
-	var l domain.Location
-	err := r.pool.QueryRow(ctx, query, businessID, name, address).Scan(
-		&l.ID,
-		&l.BusinessID,
-		&l.Name,
-		&l.Address,
-		&l.CreatedAt,
-		&l.UpdatedAt,
-	)
-	if err != nil {
-		return domain.Location{}, fmt.Errorf("failed to create location: %w", err)
-	}
-
-	return l, nil
-}
-
-func (r *PgRepository) GetLocationById(ctx context.Context, id string) (domain.Location, error) {
-	query := `
+	getLocationByIdQuery = `
 		SELECT id, business_id, name, address, created_at, updated_at
 		FROM locations
 		WHERE id = $1
 	`
+	getLocationsByBusinessIdQuery = `
+		SELECT id, business_id, name, address, created_at, updated_at
+		FROM locations
+		WHERE business_id = $1
+	`
+	deleteLocationQuery = `
+		DELETE FROM locations
+		WHERE id = $1
+	`
+)
 
-	var l domain.Location
-	err := r.pool.QueryRow(ctx, query, id).Scan(
-		&l.ID,
-		&l.BusinessID,
+func scanLocationFields(l *domain.Location, scan func(...any) error) error {
+	return scan(
+		&l.Id,
+		&l.BusinessId,
 		&l.Name,
 		&l.Address,
 		&l.CreatedAt,
 		&l.UpdatedAt,
 	)
+}
+
+func scanLocation(row pgx.Row) (domain.Location, error) {
+	var l domain.Location
+	err := scanLocationFields(&l, row.Scan)
+	if err != nil {
+		return domain.Location{}, err
+	}
+	return l, nil
+}
+
+func scanLocations(rows pgx.Rows) ([]domain.Location, error) {
+	locations := []domain.Location{}
+	for rows.Next() {
+		var l domain.Location
+		err := scanLocationFields(&l, rows.Scan)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan location: %w", err)
+		}
+		locations = append(locations, l)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate locations: %w", err)
+	}
+	return locations, nil
+}
+
+func (r *PgRepository) CreateLocation(ctx context.Context, businessId, name string, address *string) (domain.Location, error) {
+	l, err := scanLocation(r.pool.QueryRow(ctx, createLocationQuery, businessId, name, address))
+	if err != nil {
+		return domain.Location{}, fmt.Errorf("failed to create location: %w", err)
+	}
+	return l, nil
+}
+
+func (r *PgRepository) GetLocationById(ctx context.Context, id string) (domain.Location, error) {
+	l, err := scanLocation(r.pool.QueryRow(ctx, getLocationByIdQuery, id))
 	if err != nil {
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
@@ -56,48 +85,25 @@ func (r *PgRepository) GetLocationById(ctx context.Context, id string) (domain.L
 			return domain.Location{}, fmt.Errorf("failed to get location by ID: %w", err)
 		}
 	}
-
 	return l, nil
 }
 
-func (r *PgRepository) GetLocationsByBusinessID(ctx context.Context, businessID string) ([]domain.Location, error) {
-	query := `
-		SELECT id, business_id, name, address, created_at, updated_at
-		FROM locations
-		WHERE business_id = $1
-	`
-
-	var locations []domain.Location
-	rows, err := r.pool.Query(ctx, query, businessID)
+func (r *PgRepository) GetLocationsByBusinessId(ctx context.Context, businessId string) ([]domain.Location, error) {
+	rows, err := r.pool.Query(ctx, getLocationsByBusinessIdQuery, businessId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get locations by business ID: %w", err)
 	}
 	defer rows.Close()
 
-	for rows.Next() {
-		var l domain.Location
-		err := rows.Scan(
-			&l.ID,
-			&l.BusinessID,
-			&l.Name,
-			&l.Address,
-			&l.CreatedAt,
-			&l.UpdatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan location: %w", err)
-		}
-		locations = append(locations, l)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to iterate locations: %w", err)
+	locations, err := scanLocations(rows)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get locations by business ID: %w", err)
 	}
 
 	return locations, nil
 }
 
-func (r *PgRepository) UpdateLocationByID(ctx context.Context, id string, update domain.LocationUpdate) error {
+func (r *PgRepository) UpdateLocationById(ctx context.Context, id string, update domain.LocationUpdate) error {
 	builder := newUpdateBuilder()
 
 	if update.Name != nil {
@@ -107,8 +113,8 @@ func (r *PgRepository) UpdateLocationByID(ctx context.Context, id string, update
 		builder.Add("address", *update.Address)
 	}
 	if builder.IsEmpty() {
-		return nil
-	} // nothing changed
+		return nil // nothing changed
+	}
 
 	query, args := builder.Build("locations", "id", id)
 
@@ -124,11 +130,7 @@ func (r *PgRepository) UpdateLocationByID(ctx context.Context, id string, update
 }
 
 func (r *PgRepository) DeleteLocation(ctx context.Context, id string) error {
-	query := `
-		DELETE FROM locations
-		WHERE id = $1
-	`
-	cmdTag, err := r.pool.Exec(ctx, query, id)
+	cmdTag, err := r.pool.Exec(ctx, deleteLocationQuery, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete location: %w", err)
 	}

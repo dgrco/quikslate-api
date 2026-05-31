@@ -9,10 +9,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Implement UserRepository interface for PgRepository
-
-func (r *PgRepository) CreateUser(ctx context.Context, email, passwordHash string) (domain.User, error) {
-	query := `
+const (
+	createUserQuery = `
 		INSERT INTO users (email, password)
 		VALUES ($1, $2)
 		RETURNING id, email, password, 
@@ -22,18 +20,44 @@ func (r *PgRepository) CreateUser(ctx context.Context, email, passwordHash strin
 			created_at, 
 			updated_at
 	`
+	getUserByEmailQuery = `
+		SELECT id, email, password, invite_token, invite_expires_at, invite_accepted_at, created_at, updated_at
+		FROM users
+		WHERE email = $1
+	`
+	getUserByIdQuery = `
+		SELECT id, email, password, invite_token, invite_expires_at, invite_accepted_at, created_at, updated_at
+		FROM users
+		WHERE id = $1
+	`
+	deleteUserQuery = `
+		DELETE FROM users
+		WHERE id = $1
+	`
+)
 
-	var u domain.User
-	err := r.pool.QueryRow(ctx, query, email, passwordHash).Scan(
-		&u.ID,
-		&u.Email,
-		&u.Password,
-		&u.InviteToken,
-		&u.InviteExpiresAt,
-		&u.InviteAcceptedAt,
-		&u.CreatedAt,
-		&u.UpdatedAt,
-	)
+func scanUser(row pgx.Row) (domain.User, error) {
+    var u domain.User
+    err := row.Scan(
+			&u.Id,
+			&u.Email,
+			&u.Password,
+			&u.InviteToken,
+			&u.InviteExpiresAt,
+			&u.InviteAcceptedAt,
+			&u.CreatedAt,
+			&u.UpdatedAt,
+		)
+		if err != nil {
+			return domain.User{}, err
+		}
+		return u, nil
+	}
+
+// Implement UserRepository interface for PgRepository
+
+func (r *PgRepository) CreateUser(ctx context.Context, email, passwordHash string) (domain.User, error) {
+	u, err := scanUser(r.pool.QueryRow(ctx, createUserQuery, email, passwordHash))
 	if err != nil {
 		return domain.User{}, fmt.Errorf("failed to create user: %w", err)
 	}
@@ -42,23 +66,7 @@ func (r *PgRepository) CreateUser(ctx context.Context, email, passwordHash strin
 }
 
 func (r *PgRepository) GetUserByEmail(ctx context.Context, email string) (domain.User, error) {
-	query := `
-		SELECT id, email, password, invite_token, invite_expires_at, invite_accepted_at, created_at, updated_at
-		FROM users
-		WHERE email = $1
-	`
-
-	var u domain.User
-	err := r.pool.QueryRow(ctx, query, email).Scan(
-		&u.ID,
-		&u.Email,
-		&u.Password,
-		&u.InviteToken,
-		&u.InviteExpiresAt,
-		&u.InviteAcceptedAt,
-		&u.CreatedAt,
-		&u.UpdatedAt,
-	)
+	u, err := scanUser(r.pool.QueryRow(ctx, getUserByEmailQuery, email))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.User{}, domain.ErrNotFound
 	}
@@ -70,23 +78,7 @@ func (r *PgRepository) GetUserByEmail(ctx context.Context, email string) (domain
 }
 
 func (r *PgRepository) GetUserById(ctx context.Context, id string) (domain.User, error) {
-	query := `
-		SELECT id, email, password, invite_token, invite_expires_at, invite_accepted_at, created_at, updated_at
-		FROM users
-		WHERE id = $1
-	`
-
-	var u domain.User
-	err := r.pool.QueryRow(ctx, query, id).Scan(
-		&u.ID,
-		&u.Email,
-		&u.Password,
-		&u.InviteToken,
-		&u.InviteExpiresAt,
-		&u.InviteAcceptedAt,
-		&u.CreatedAt,
-		&u.UpdatedAt,
-	)
+	u, err := scanUser(r.pool.QueryRow(ctx, getUserByIdQuery, id))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.User{}, domain.ErrNotFound
 	}
@@ -98,12 +90,7 @@ func (r *PgRepository) GetUserById(ctx context.Context, id string) (domain.User,
 }
 
 func (r *PgRepository) DeleteUser(ctx context.Context, id string) error {
-	query := `
-		DELETE FROM users
-		WHERE id = $1
-	`
-
-	_, err := r.pool.Exec(ctx, query, id)
+	_, err := r.pool.Exec(ctx, deleteUserQuery, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}

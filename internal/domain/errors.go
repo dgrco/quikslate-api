@@ -7,7 +7,8 @@ var (
 	ErrNotFound            = errors.New("not found")
 	ErrAlreadyExists       = errors.New("already exists")
 	ErrInvalidCredentials  = errors.New("invalid credentials")
-	ErrInvalidRefreshToken = errors.New("invalid refresh token") // non-existent or expired
+	ErrInvalidRefreshToken = errors.New("invalid refresh token") // if non-existent or expired
+	ErrUnauthorized        = errors.New("unauthorized")
 )
 
 // Validation Errors

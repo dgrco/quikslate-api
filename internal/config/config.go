@@ -10,7 +10,6 @@ import (
 type Config struct {
 	ApiPort     string
 	DatabaseUrl string
-	RedisUrl    string
 	JWTSecret   string
 	SecureMode  string
 }
@@ -20,7 +19,6 @@ func Load() *Config {
 	return &Config{
 		ApiPort:     getEnv("API_PORT", "8080"),
 		DatabaseUrl: mustGetEnv("DATABASE_URL"),
-		RedisUrl:    mustGetEnv("REDIS_URL"),
 		JWTSecret:   mustGetEnv("JWT_SECRET"),
 		SecureMode:  getEnv("SECURE_MODE", "true"),
 	}

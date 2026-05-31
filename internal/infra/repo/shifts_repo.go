@@ -10,57 +10,93 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func (r *PgRepository) CreateShift(
-	ctx context.Context,
-	userID *string,
-	locationID, positionID string,
-	status domain.ShiftStatus,
-	startTime, endTime time.Time,
-) (domain.Shift, error) {
-	query := `
+const (
+	createShiftQuery = `
 		INSERT INTO shifts (user_id, location_id, position_id, status, start_time, end_time)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, user_id, location_id, position_id, status, start_time, end_time, created_at, updated_at
 	`
-
-	var s domain.Shift
-	err := r.pool.QueryRow(ctx, query, userID, locationID, positionID, status, startTime, endTime).Scan(
-		&s.ID,
-		&s.UserID,
-		&s.LocationID,
-		&s.PositionID,
-		&s.Status,
-		&s.StartTime,
-		&s.EndTime,
-		&s.CreatedAt,
-		&s.UpdatedAt,
-	)
-	if err != nil {
-		return domain.Shift{}, fmt.Errorf("failed to create shift: %w", err)
-	}
-
-	return s, nil
-}
-
-func (r *PgRepository) GetShiftByID(ctx context.Context, id string) (domain.Shift, error) {
-	query := `
+	getShiftByIdQuery = `
 		SELECT id, user_id, location_id, position_id, status, start_time, end_time, created_at, updated_at
 		FROM shifts
 		WHERE id = $1
 	`
+	getShiftsByLocationIdQuery = `
+		SELECT id, user_id, location_id, position_id, status, start_time, end_time, created_at, updated_at
+		FROM shifts
+		WHERE location_id = $1
+	`
+	unassignShiftQuery = `
+		UPDATE shifts
+		SET user_id = NULL, status = 'uncovered', updated_at = NOW()
+		WHERE id = $1
+	`
+	cancelShiftQuery = `
+		UPDATE shifts
+		SET status = 'cancelled', updated_at = NOW()
+		WHERE id = $1
+	`
+	deleteShiftQuery = `
+		DELETE FROM shifts
+		WHERE id = $1
+	`
+)
 
-	var s domain.Shift
-	err := r.pool.QueryRow(ctx, query, id).Scan(
-		&s.ID,
-		&s.UserID,
-		&s.LocationID,
-		&s.PositionID,
+func scanShiftFields(s *domain.Shift, scan func(...any) error) error {
+	return scan(
+		&s.Id,
+		&s.UserId,
+		&s.LocationId,
+		&s.PositionId,
 		&s.Status,
 		&s.StartTime,
 		&s.EndTime,
 		&s.CreatedAt,
 		&s.UpdatedAt,
 	)
+}
+
+func scanShift(row pgx.Row) (domain.Shift, error) {
+	var s domain.Shift
+	err := scanShiftFields(&s, row.Scan)
+	if err != nil {
+		return domain.Shift{}, err
+	}
+	return s, nil
+}
+
+func scanShifts(rows pgx.Rows) ([]domain.Shift, error) {
+	shifts := []domain.Shift{}
+	for rows.Next() {
+		var s domain.Shift
+		err := scanShiftFields(&s, rows.Scan)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan shift: %w", err)
+		}
+		shifts = append(shifts, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate shifts: %w", err)
+	}
+	return shifts, nil
+}
+
+func (r *PgRepository) CreateShift(
+	ctx context.Context,
+	userId *string,
+	locationId, positionId string,
+	status domain.ShiftStatus,
+	startTime, endTime time.Time,
+) (domain.Shift, error) {
+	s, err := scanShift(r.pool.QueryRow(ctx, createShiftQuery, userId, locationId, positionId, status, startTime, endTime))
+	if err != nil {
+		return domain.Shift{}, fmt.Errorf("failed to create shift: %w", err)
+	}
+	return s, nil
+}
+
+func (r *PgRepository) GetShiftById(ctx context.Context, id string) (domain.Shift, error) {
+	s, err := scanShift(r.pool.QueryRow(ctx, getShiftByIdQuery, id))
 	if err != nil {
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
@@ -69,51 +105,25 @@ func (r *PgRepository) GetShiftByID(ctx context.Context, id string) (domain.Shif
 			return domain.Shift{}, fmt.Errorf("failed to get shift by ID: %w", err)
 		}
 	}
-
 	return s, nil
 }
 
-func (r *PgRepository) GetShiftsByLocationID(ctx context.Context, locationID string) ([]domain.Shift, error) {
-	query := `
-		SELECT id, user_id, location_id, position_id, status, start_time, end_time, created_at, updated_at
-		FROM shifts
-		WHERE location_id = $1
-	`
-
-	var shifts []domain.Shift
-	rows, err := r.pool.Query(ctx, query, locationID)
+func (r *PgRepository) GetShiftsByLocationId(ctx context.Context, locationId string) ([]domain.Shift, error) {
+	rows, err := r.pool.Query(ctx, getShiftsByLocationIdQuery, locationId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get shifts by location ID: %w", err)
 	}
 	defer rows.Close()
 
-	for rows.Next() {
-		var s domain.Shift
-		err := rows.Scan(
-			&s.ID,
-			&s.UserID,
-			&s.LocationID,
-			&s.PositionID,
-			&s.Status,
-			&s.StartTime,
-			&s.EndTime,
-			&s.CreatedAt,
-			&s.UpdatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan shift: %w", err)
-		}
-		shifts = append(shifts, s)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to iterate shifts: %w", err)
+	shifts, err := scanShifts(rows)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get shifts by location ID: %w", err)
 	}
 
 	return shifts, nil
 }
 
-func (r *PgRepository) UpdateShiftByID(ctx context.Context, id string, update domain.ShiftUpdate) error {
+func (r *PgRepository) UpdateShiftById(ctx context.Context, id string, update domain.ShiftUpdate) error {
 	builder := newUpdateBuilder()
 	if update.Status != nil {
 		builder.Add("status", *update.Status)
@@ -140,13 +150,7 @@ func (r *PgRepository) UpdateShiftByID(ctx context.Context, id string, update do
 }
 
 func (r *PgRepository) UnassignShift(ctx context.Context, id string) error {
-	query := `
-		UPDATE shifts
-		SET user_id = NULL, status = 'uncovered', updated_at = NOW()
-		WHERE id = $1
-	`
-
-	cmdTag, err := r.pool.Exec(ctx, query, id)
+	cmdTag, err := r.pool.Exec(ctx, unassignShiftQuery, id)
 	if err != nil {
 		return fmt.Errorf("failed to unassign shift: %w", err)
 	}
@@ -158,13 +162,7 @@ func (r *PgRepository) UnassignShift(ctx context.Context, id string) error {
 
 // Soft-delete a shift (use this over DeleteShift most of the time)
 func (r *PgRepository) CancelShift(ctx context.Context, id string) error {
-	query := `
-		UPDATE shifts
-		SET status = 'cancelled', updated_at = NOW()
-		WHERE id = $1
-	`
-
-	cmdTag, err := r.pool.Exec(ctx, query, id)
+	cmdTag, err := r.pool.Exec(ctx, cancelShiftQuery, id)
 	if err != nil {
 		return fmt.Errorf("failed to cancel shift: %w", err)
 	}
@@ -176,12 +174,7 @@ func (r *PgRepository) CancelShift(ctx context.Context, id string) error {
 
 // Hard-delete a shift (should only be used for admin purposes)
 func (r *PgRepository) DeleteShift(ctx context.Context, id string) error {
-	query := `
-		DELETE FROM shifts
-		WHERE id = $1
-	`
-
-	cmdTag, err := r.pool.Exec(ctx, query, id)
+	cmdTag, err := r.pool.Exec(ctx, deleteShiftQuery, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete shift: %w", err)
 	}

@@ -3,12 +3,12 @@ package domain
 import "context"
 
 type EmployeePosition struct {
-	UserID     string `json:"user_id"`
-	PositionID string `json:"position_id"`
+	UserId     string `json:"user_id"`
+	PositionId string `json:"position_id"`
 }
 
 type EmployeePositionRepository interface { 
-	AddPosition(ctx context.Context, userID, positionID string) error
-	RemovePosition(ctx context.Context, userID, positionID string) error
-	GetPositionsByUserID(ctx context.Context, userID string) ([]EmployeePosition, error)
+	AddPosition(ctx context.Context, userId, positionId string) error
+	RemovePosition(ctx context.Context, userId, positionId string) error
+	GetPositionsByUserId(ctx context.Context, userId string) ([]EmployeePosition, error)
 }

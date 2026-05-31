@@ -35,8 +35,9 @@ func NewAuthHandler(authService *service.AuthService, secure bool) *AuthHandler 
 // Request Body Structures
 
 type registerRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email        string `json:"email"`
+	Password     string `json:"password"`
+	BusinessName string `json:"business_name"`
 }
 
 type loginRequest struct {
@@ -63,7 +64,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authResponse, err := h.authService.Register(r.Context(), req.Email, req.Password)
+	authResponse, err := h.authService.Register(r.Context(), req.Email, req.Password, req.BusinessName)
 	if err != nil {
 		var validationErr *domain.ValidationError
 		switch {

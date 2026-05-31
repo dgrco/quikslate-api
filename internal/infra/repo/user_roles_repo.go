@@ -9,14 +9,42 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func (r *PgRepository) AssignRole(ctx context.Context, userID, businessID string, locationID *string, role domain.Role) error {
-	query := `
+const (
+	assignRoleQuery = `
 		INSERT INTO user_roles (user_id, business_id, location_id, role)
 		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (user_id, business_id) DO UPDATE SET role = EXCLUDED.role, updated_at = NOW()
 	`
+	getUserRoleQuery = `
+		SELECT id, user_id, business_id, location_id, role, created_at, updated_at
+		FROM user_roles
+		WHERE user_id = $1 AND business_id = $2
+	`
+	deleteUserRoleQuery = `
+		DELETE FROM user_roles
+		WHERE user_id = $1 AND business_id = $2
+	`
+)
 
-	_, err := r.pool.Exec(ctx, query, userID, businessID, locationID, role)
+func scanUserRole(row pgx.Row) (domain.UserRole, error) {
+	var urole domain.UserRole
+	err := row.Scan(
+		&urole.Id,
+		&urole.UserId,
+		&urole.BusinessId,
+		&urole.LocationId,
+		&urole.Role,
+		&urole.CreatedAt,
+		&urole.UpdatedAt,
+	)
+	if err != nil {
+		return domain.UserRole{}, err
+	}
+	return urole, nil
+}
+
+func (r *PgRepository) AssignRole(ctx context.Context, userId, businessId string, locationId *string, role domain.Role) error {
+	_, err := r.pool.Exec(ctx, assignRoleQuery, userId, businessId, locationId, role)
 	if err != nil {
 		return fmt.Errorf("failed to assign role: %w", err)
 	}
@@ -24,23 +52,8 @@ func (r *PgRepository) AssignRole(ctx context.Context, userID, businessID string
 	return nil
 }
 
-func (r *PgRepository) GetUserRole(ctx context.Context, userID, businessID string) (domain.UserRole, error) {
-	query := `
-		SELECT id, user_id, business_id, location_id, role, created_at, updated_at
-		FROM user_roles
-		WHERE user_id = $1 AND business_id = $2
-	`
-
-	var urole domain.UserRole
-	err := r.pool.QueryRow(ctx, query, userID, businessID).Scan(
-		&urole.ID,
-		&urole.UserID,
-		&urole.BusinessID,
-		&urole.LocationID,
-		&urole.Role,
-		&urole.CreatedAt,
-		&urole.UpdatedAt,
-	)
+func (r *PgRepository) GetUserRole(ctx context.Context, userId, businessId string) (domain.UserRole, error) {
+	urole, err := scanUserRole(r.pool.QueryRow(ctx, getUserRoleQuery, userId, businessId))
 	if err != nil {
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
@@ -53,13 +66,8 @@ func (r *PgRepository) GetUserRole(ctx context.Context, userID, businessID strin
 	return urole, nil
 }
 
-func (r *PgRepository) RemoveRole(ctx context.Context, userID, businessID string) error {
-	query := `
-		DELETE FROM user_roles
-		WHERE user_id = $1 AND business_id = $2
-	`
-
-	cmdTag, err := r.pool.Exec(ctx, query, userID, businessID)
+func (r *PgRepository) RemoveRole(ctx context.Context, userId, businessId string) error {
+	cmdTag, err := r.pool.Exec(ctx, deleteUserRoleQuery, userId, businessId)
 	if err != nil {
 		return fmt.Errorf("failed to remove role: %w", err)
 	}

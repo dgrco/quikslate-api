@@ -10,69 +10,65 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// NOTE: Projections are explicit even when they are * (all) for clarity in Scan order
-
-func (r *PgRepository) CreateRefreshToken(ctx context.Context, userID, token string, expiresAt time.Time) (domain.RefreshToken, error) {
-	query := `
+const (
+	createRefreshTokenQuery = `
 		INSERT INTO refresh_tokens (user_id, token, expires_at)
 		VALUES ($1, $2, $3)
 		RETURNING id, user_id, token, expires_at, created_at
 	`
+	getRefreshTokenQuery = `
+		SELECT id, user_id, token, expires_at, created_at
+		FROM refresh_tokens
+		WHERE token = $1
+	`
+	deleteRefreshTokenQuery = `
+		DELETE FROM refresh_tokens
+		WHERE token = $1
+	`
+)
 
+func scanRefreshToken(row pgx.Row) (domain.RefreshToken, error) {
 	var t domain.RefreshToken
-	err := r.pool.QueryRow(ctx, query, userID, token, expiresAt).Scan(
-		&t.ID,
-		&t.UserID,
+	err := row.Scan(
+		&t.Id,
+		&t.UserId,
 		&t.Token,
 		&t.ExpiresAt,
 		&t.CreatedAt,
 	)
 	if err != nil {
+		return domain.RefreshToken{}, err
+	}
+	return t, nil
+}
+
+func (r *PgRepository) CreateRefreshToken(ctx context.Context, userId, token string, expiresAt time.Time) (domain.RefreshToken, error) {
+	t, err := scanRefreshToken(r.pool.QueryRow(ctx, createRefreshTokenQuery, userId, token, expiresAt))
+	if err != nil {
 		return domain.RefreshToken{}, fmt.Errorf("failed to create refresh token: %w", err)
 	}
-
 	return t, nil
 }
 
 func (r *PgRepository) GetRefreshToken(ctx context.Context, token string) (domain.RefreshToken, error) {
-	query := `
-		SELECT id, user_id, token, expires_at, created_at
-		FROM refresh_tokens
-		WHERE token = $1
-	`
-
-	var t domain.RefreshToken
-	err := r.pool.QueryRow(ctx, query, token).Scan(
-		&t.ID,
-		&t.UserID,
-		&t.Token,
-		&t.ExpiresAt,
-		&t.CreatedAt,
-	)
+	t, err := scanRefreshToken(r.pool.QueryRow(ctx, getRefreshTokenQuery, token))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.RefreshToken{}, domain.ErrNotFound
 	}
 	if err != nil {
 		return domain.RefreshToken{}, fmt.Errorf("failed to get refresh token: %w", err)
 	}
-
 	return t, nil
 }
 
 func (r *PgRepository) DeleteRefreshToken(ctx context.Context, token string) error {
-	query := `
-		DELETE FROM refresh_tokens
-		WHERE token = $1
-	`
-
-	cmdTag, err := r.pool.Exec(ctx, query, token)
+	cmdTag, err := r.pool.Exec(ctx, deleteRefreshTokenQuery, token)
 	if err != nil {
 		return fmt.Errorf("failed to delete refresh token: %w", err)
 	}
 	if cmdTag.RowsAffected() == 0 {
 		return domain.ErrNotFound
 	}
-
 	return nil
 }
 

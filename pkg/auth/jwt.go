@@ -8,14 +8,14 @@ import (
 )
 
 type Claims struct {
-	UserID string `json:"user_id"`
+	UserId string `json:"user_id"`
 	jwt.RegisteredClaims
 }
 
 // GenerateJWT returns a signed JWT token string on success, or an error if signing fails
-func GenerateJWT(userID string, secret string) (string, error) {
+func GenerateJWT(userId string, secret string) (string, error) {
 	claims := &Claims{
-		UserID: userID,
+		UserId: userId,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

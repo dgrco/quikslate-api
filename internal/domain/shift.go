@@ -16,10 +16,10 @@ const (
 )
 
 type Shift struct {
-	ID         string      `json:"id"`
-	UserID     *string     `json:"user_id"`
-	LocationID string      `json:"location_id"`
-	PositionID string      `json:"position_id"`
+	Id         string      `json:"id"`
+	UserId     *string     `json:"user_id"`
+	LocationId string      `json:"location_id"`
+	PositionId string      `json:"position_id"`
 	Status     ShiftStatus `json:"status"`
 	StartTime  time.Time   `json:"start_time"`
 	EndTime    time.Time   `json:"end_time"`
@@ -36,14 +36,14 @@ type ShiftUpdate struct {
 type ShiftRepository interface {
 	CreateShift(
 		ctx context.Context,
-		userID *string,
-		locationID, positionID string,
+		userId *string,
+		locationId, positionId string,
 		status ShiftStatus,
 		startTime, endTime time.Time,
 	) (Shift, error)
-	GetShiftByID(ctx context.Context, id string) (Shift, error)
-	GetShiftsByLocationID(ctx context.Context, locationID string) ([]Shift, error)
-	UpdateShiftByID(ctx context.Context, id string, update ShiftUpdate) error
+	GetShiftById(ctx context.Context, id string) (Shift, error)
+	GetShiftsByLocationId(ctx context.Context, locationId string) ([]Shift, error)
+	UpdateShiftById(ctx context.Context, id string, update ShiftUpdate) error
 	UnassignShift(ctx context.Context, id string) error
 	CancelShift(ctx context.Context, id string) error
 	DeleteShift(ctx context.Context, id string) error

@@ -9,7 +9,7 @@ import (
 	"github.com/dgrco/quikslate/internal/database"
 	"github.com/dgrco/quikslate/internal/handler"
 	"github.com/dgrco/quikslate/internal/infra/repo"
-	middleware "github.com/dgrco/quikslate/internal/middleware"
+	_ "github.com/dgrco/quikslate/internal/middleware"
 	"github.com/dgrco/quikslate/internal/service"
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
@@ -41,13 +41,6 @@ func main() {
 
 	// Route Setup
 	authHandler.SetupRoutes(r)
-
-	r.Route("/protected", func(r chi.Router) {
-		r.Use(middleware.AuthMiddleware(cfg.JWTSecret))
-		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("Hello world"))
-		})
-	})
 
 	// Listen
 	log.Printf("Server started on port %s", cfg.ApiPort)

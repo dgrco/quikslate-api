@@ -78,9 +78,12 @@ func (r *PgRepository) ChangeBusinessName(ctx context.Context, id, newName strin
 }
 
 func (r *PgRepository) DeleteBusiness(ctx context.Context, id string) error {
-	_, err := r.pool.Exec(ctx, deleteBusinessQuery, id)
+	cmdTag, err := r.pool.Exec(ctx, deleteBusinessQuery, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete business: %w", err)
+	}
+	if cmdTag.RowsAffected() == 0 {
+		return domain.ErrNotFound
 	}
 	return nil
 }

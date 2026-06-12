@@ -1,0 +1,38 @@
+flowchart TD
+    Claims["JWT Claims\n──────────────\nuserId\nbusinessId\nlocationId\nisAdmin\nrole"]
+
+    Claims --> A{isAdmin?}
+
+    A -->|"true + locationId not set"| AdminOnly
+    A -->|true + locationId set| AdminFull
+    A -->|"false + role = manager"| Mgr
+    A -->|"false + role = employee"| Emp
+
+    subgraph AdminOnly ["🔐 Admin-Only Session"]
+      AO1["✅ Rename / manage business"]
+      AO2["✅ Create / edit / delete locations"]
+      AO3["✅ Create / rename / delete positions"]
+      AO4["✅ Add / remove employees from business"]
+      AO5["✅ Assign employee positions"]
+      AO6["❌ Cannot view or manage shifts\n    (no location in context)"]
+    end
+
+    subgraph AdminFull ["🔐 Admin + Location Session"]
+      AF1["✅ Everything in admin-only"]
+      AF2["✅ View & manage shifts\n    at the selected location"]
+    end
+
+    subgraph Mgr ["👔 Manager Session"]
+      M1["✅ View shifts at their location"]
+      M2["✅ Create / edit / delete shifts"]
+      M3["✅ Publish shifts to employees"]
+      M4["✅ Manage employees at their location"]
+      M5["❌ Cannot touch business settings"]
+      M6["❌ Cannot access other locations"]
+    end
+
+    subgraph Emp ["👤 Employee Session"]
+      E1["✅ View their own shifts"]
+      E2["❌ Cannot create or edit shifts"]
+      E3["❌ Cannot manage other employees"]
+    end

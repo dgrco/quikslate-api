@@ -8,7 +8,8 @@ type Repo interface {
 	LocationRepository
 	PositionRepository
 	ShiftRepository
-	UserRoleRepository
+	LocationRoleRepository
+	BusinessMemberRepository
 	EmployeePositionRepository
 	CompositeRepository
 }

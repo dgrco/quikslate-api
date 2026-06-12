@@ -8,10 +8,8 @@ import (
 	"github.com/dgrco/quikslate/internal/ctxkeys"
 	"github.com/dgrco/quikslate/internal/domain"
 	"github.com/dgrco/quikslate/internal/response"
-	"github.com/dgrco/quikslate/pkg/auth"
+	"github.com/dgrco/quikslate/internal/auth"
 )
-
-const UserIdKey ctxkeys.StringContextKey = "userId"
 
 func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -29,7 +27,11 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), UserIdKey, claims.UserId)
+			ctx := context.WithValue(r.Context(), ctxkeys.UserId, claims.UserId)
+			ctx = context.WithValue(ctx, ctxkeys.BusinessId, claims.BusinessId)
+			ctx = context.WithValue(ctx, ctxkeys.IsAdmin, claims.IsAdmin)
+			ctx = context.WithValue(ctx, ctxkeys.LocationId, claims.LocationId)
+			ctx = context.WithValue(ctx, ctxkeys.Role, claims.Role)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

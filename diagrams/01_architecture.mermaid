@@ -1,0 +1,57 @@
+graph TD
+    Client(["🌐 Client"])
+
+    subgraph Router ["Chi Router (main.go)"]
+      PublicRoutes["/auth/* — public"]
+      ProtectedRoutes["/* — protected"]
+      AuthMW["JWT Middleware\nextract claims → context"]
+    end
+
+    subgraph Handlers ["Handlers Layer"]
+      AH["AuthHandler"]
+      SH["ShiftHandler"]
+      LH["LocationHandler"]
+      PH["PositionHandler"]
+      EH["EmployeeHandler"]
+      BH["BusinessHandler"]
+    end
+
+    subgraph Services ["Service Layer"]
+      AS["AuthService"]
+      SS["ShiftService"]
+      LS["LocationService"]
+      PS["PositionService"]
+      ES["EmployeeService"]
+      BS["BusinessService"]
+    end
+
+    subgraph Repo ["domain.Repo interface"]
+      RI["Composite Repo\n(wraps all sub-repos)"]
+    end
+
+    subgraph Infra ["Infra Layer (pgx)"]
+      UR["UserRepo"]
+      BR["BusinessRepo"]
+      LR["LocationRepo"]
+      LRR["LocationRoleRepo"]
+      PR["PositionRepo"]
+      SR["ShiftRepo"]
+      RTR["RefreshTokenRepo"]
+      EPR["EmployeePositionRepo"]
+    end
+
+    DB[("🐘 PostgreSQL")]
+
+    Client --> PublicRoutes
+    Client --> ProtectedRoutes
+    ProtectedRoutes --> AuthMW --> Handlers
+    PublicRoutes --> AH
+    AH --> AS
+    SH --> SS
+    LH --> LS
+    PH --> PS
+    EH --> ES
+    BH --> BS
+    AS & SS & LS & PS & ES & BS --> RI
+    RI --> UR & BR & LR & LRR & PR & SR & RTR & EPR
+    UR & BR & LR & LRR & PR & SR & RTR & EPR --> DB

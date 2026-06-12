@@ -27,6 +27,13 @@ type Shift struct {
 	UpdatedAt  time.Time   `json:"updated_at"`
 }
 
+func ValidateShiftTimes(startTime, endTime time.Time) error {
+	if !startTime.Before(endTime) {
+		return ErrInvalidShiftTimes
+	}
+	return nil
+}
+
 type ShiftUpdate struct {
 	Status    *ShiftStatus
 	StartTime *time.Time
@@ -44,6 +51,7 @@ type ShiftRepository interface {
 	GetShiftById(ctx context.Context, id string) (Shift, error)
 	GetShiftsByLocationId(ctx context.Context, locationId string) ([]Shift, error)
 	UpdateShiftById(ctx context.Context, id string, update ShiftUpdate) error
+	AssignShift(ctx context.Context, id, userId string) error
 	UnassignShift(ctx context.Context, id string) error
 	CancelShift(ctx context.Context, id string) error
 	DeleteShift(ctx context.Context, id string) error

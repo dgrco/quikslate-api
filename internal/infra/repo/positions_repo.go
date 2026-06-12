@@ -7,6 +7,7 @@ import (
 
 	"github.com/dgrco/quikslate/internal/domain"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 const (
@@ -74,6 +75,9 @@ func scanPositions(rows pgx.Rows) ([]domain.Position, error) {
 func (r *PgRepository) CreatePosition(ctx context.Context, businessId, name string) (domain.Position, error) {
 	p, err := scanPosition(r.pool.QueryRow(ctx, createPositionQuery, businessId, name))
 	if err != nil {
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == ErrPgUniqueConstraintViolation {
+			return domain.Position{}, domain.ErrAlreadyExists
+		}
 		return domain.Position{}, fmt.Errorf("failed to create position: %w", err)
 	}
 	return p, nil

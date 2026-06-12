@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dgrco/quikslate/internal/auth"
 	"github.com/dgrco/quikslate/internal/domain"
-	"github.com/dgrco/quikslate/pkg/auth"
 )
 
 type AuthService struct {
@@ -26,24 +26,26 @@ func NewAuthService(repo domain.Repo, jwtSecret string) *AuthService {
 }
 
 type AuthResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
+	AccessToken               string                `json:"access_token,omitempty"`
+	RefreshToken              string                `json:"refresh_token,omitempty"`
+
+	// Below are fields used for business/location selection
+	Businesses                []domain.Business     `json:"businesses,omitempty"`
+	Locations                 []domain.LocationRole `json:"locations,omitempty"`
+	UserId										string 								`json:"user_id,omitempty"`
+	RequiresBusinessSelection bool                  `json:"requires_business_selection"`
+	RequiresLocationSelection bool                  `json:"requires_location_selection"`
 }
 
 func (s *AuthService) Register(ctx context.Context, email, password, businessName string) (*AuthResponse, error) {
 	// validate email and password
-	err := domain.ValidateRegistrationCredentials(email, password, businessName)
-	if err != nil {
+	if err := domain.ValidateUserRegistrationCredentials(email, password); err != nil {
 		return nil, err
 	}
 
-	// check if user already exists
-	_, err = s.repo.GetUserByEmail(ctx, email)
-	if err == nil {
-		return nil, domain.ErrAlreadyExists
-	}
-	if !errors.Is(err, domain.ErrNotFound) {
-		return nil, fmt.Errorf("failed to check existing user: %w", err)
+	// validate businessName
+	if err := domain.ValidateBusinessName(businessName); err != nil {
+		return nil, err
 	}
 
 	// hash password
@@ -53,13 +55,15 @@ func (s *AuthService) Register(ctx context.Context, email, password, businessNam
 	}
 
 	// create user & business
-	user, _, err := s.repo.CreateUserWithBusiness(ctx, email, hashed, businessName)
+	// TODO: separate creating user w/ business and non-admin registrations
+	user, business, err := s.repo.CreateUserWithBusiness(ctx, email, hashed, businessName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user with business: %w", err)
 	}
 
 	// generate tokens
-	return s.generateTokens(ctx, user.Id)
+	// this is a new user + business registration -> set new user to admin
+	return s.generateTokens(ctx, user.Id, business.Id, domain.EmptyLocation, true, domain.EmptyRole)
 }
 
 func (s *AuthService) Login(ctx context.Context, email, password string) (*AuthResponse, error) {
@@ -75,7 +79,33 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*AuthR
 		return nil, domain.ErrInvalidCredentials
 	}
 
-	return s.generateTokens(ctx, user.Id)
+	bms, err := s.repo.GetBusinessMembersByUserId(ctx, user.Id)
+	if err != nil {
+		return nil, fmt.Errorf("login error: %w", err)
+	}
+
+	if len(bms) == 0 {
+		return nil, fmt.Errorf("login error: user belongs to no business")
+	}
+
+	if len(bms) == 1 {
+		return s.SelectBusiness(ctx, user.Id, bms[0].BusinessId)
+	}
+
+	// user belongs to more than one business
+	businesses := []domain.Business{}
+	for _, bm := range bms {
+		b, err := s.repo.GetBusinessById(ctx, bm.BusinessId)
+		if err != nil {
+			return nil, fmt.Errorf("login error: %w", err)
+		}
+		businesses = append(businesses, b)
+	}
+
+	return &AuthResponse{
+		Businesses:                businesses,
+		RequiresBusinessSelection: true,
+	}, nil
 }
 
 func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthResponse, error) {
@@ -89,7 +119,9 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthRe
 
 	// check it hasn't expired
 	if time.Now().After(stored.ExpiresAt) {
-		s.repo.DeleteRefreshToken(ctx, hashedToken)
+		if err := s.repo.DeleteRefreshToken(ctx, hashedToken); err != nil {
+			return nil, fmt.Errorf("failed to rotate refresh token: %w", err)
+		}
 		return nil, domain.ErrInvalidRefreshToken
 	}
 
@@ -98,7 +130,23 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthRe
 		return nil, fmt.Errorf("failed to rotate refresh token: %w", err)
 	}
 
-	return s.generateTokens(ctx, stored.UserId)
+	// fetch business member data for the user
+	bm, err := s.repo.GetBusinessMember(ctx, stored.UserId, stored.BusinessId)
+	if err != nil {
+		return nil, domain.ErrNotFound
+	}
+
+	locationId := stored.LocationId
+	var role domain.LRole
+	if stored.LocationId != "" && !bm.IsAdmin {
+		lr, err := s.repo.GetLocationRole(ctx, stored.UserId, stored.LocationId)
+		if err != nil {
+			return nil, domain.ErrNotFound
+		}
+		role = lr.Role
+	}
+
+	return s.generateTokens(ctx, bm.UserId, bm.BusinessId, locationId, bm.IsAdmin, role)
 }
 
 func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
@@ -106,10 +154,50 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
 	return s.repo.DeleteRefreshToken(ctx, hashedToken)
 }
 
+// Requires explicit userId, businessId since this can be called at login-time (context not yet filled!)
+func (s *AuthService) SelectBusiness(ctx context.Context, userId, businessId string) (*AuthResponse, error) {
+	bm, err := s.repo.GetBusinessMember(ctx, userId, businessId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select business: %w", err)
+	}
+
+	lrs, err := s.repo.GetLocationRolesByUserAndBusiness(ctx, userId, businessId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select business: %w", err)
+	}
+
+	if bm.IsAdmin && len(lrs) == 0 {
+		return s.generateTokens(ctx, userId, businessId, domain.EmptyLocation, bm.IsAdmin, domain.EmptyRole)
+	} else if len(lrs) == 1 {
+		return s.generateTokens(ctx, userId, businessId, lrs[0].LocationId, bm.IsAdmin, lrs[0].Role)
+	} else {
+		// Many locations -> requires selection
+		return &AuthResponse{Locations: lrs, RequiresLocationSelection: true}, nil
+	}
+}
+
+// Requires explicit userId, businessId, locationId since this can be called at login-time (context not yet filled!)
+func (s *AuthService) SelectLocation(ctx context.Context, userId, businessId, locationId string) (*AuthResponse, error) {
+	bm, err := s.repo.GetBusinessMember(ctx, userId, businessId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select location: %w", err)
+	}
+
+	role := domain.EmptyRole
+	if !bm.IsAdmin {
+		lr, err := s.repo.GetLocationRole(ctx, userId, locationId)
+		if err != nil {
+			return nil, fmt.Errorf("failed to select location: %w", err)
+		}
+		role = lr.Role
+	}
+	return s.generateTokens(ctx, bm.UserId, bm.BusinessId, locationId, bm.IsAdmin, role)
+}
+
 // generateTokens creates a JWT and a refresh token for a given user
-func (s *AuthService) generateTokens(ctx context.Context, userId string) (*AuthResponse, error) {
+func (s *AuthService) generateTokens(ctx context.Context, userId, businessId, locationId string, isAdmin bool, role domain.LRole) (*AuthResponse, error) {
 	// generate JWT
-	accessToken, err := auth.GenerateJWT(userId, s.jwtSecret)
+	accessToken, err := auth.GenerateJWT(userId, businessId, locationId, isAdmin, role, s.jwtSecret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
@@ -125,14 +213,15 @@ func (s *AuthService) generateTokens(ctx context.Context, userId string) (*AuthR
 
 	// store hashed refresh token in database
 	expiresAt := time.Now().Add(30 * 24 * time.Hour)
-	_, err = s.repo.CreateRefreshToken(ctx, userId, hashedToken, expiresAt)
+	_, err = s.repo.CreateRefreshToken(ctx, userId, businessId, locationId, hashedToken, expiresAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store refresh token: %w", err)
 	}
 
 	return &AuthResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
+		AccessToken:               accessToken,
+		RefreshToken:              refreshToken,
+		RequiresBusinessSelection: false,
 	}, nil
 }
 

@@ -3,7 +3,6 @@ package domain
 import (
 	"context"
 	"regexp"
-	"strings"
 	"time"
 )
 
@@ -18,9 +17,9 @@ type User struct {
 	UpdatedAt        time.Time  `json:"updated_at"`
 }
 
-// ValidateRegistrationCredentials checks for certain conditions on the email
-// and password fields. If these conditions are not met, an error is returned.
-func ValidateRegistrationCredentials(email, password, businessName string) error {
+// ValidateUserRegistrationCredentials checks for certain conditions on the email and
+// password. If these conditions are not met, an error is returned.
+func ValidateUserRegistrationCredentials(email, password string) error {
 	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 	if !emailRegex.Match([]byte(email)) {
 		return NewValidationError("email is invalid")
@@ -28,10 +27,6 @@ func ValidateRegistrationCredentials(email, password, businessName string) error
 
 	if len(password) < 8 {
 		return NewValidationError("password must be at least 8 characters long")
-	}
-
-	if strings.TrimSpace(businessName) == "" {
-		return NewValidationError("business name must be set")
 	}
 
 	return nil

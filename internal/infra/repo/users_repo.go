@@ -7,6 +7,7 @@ import (
 
 	"github.com/dgrco/quikslate/internal/domain"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 const (
@@ -59,6 +60,9 @@ func scanUser(row pgx.Row) (domain.User, error) {
 func (r *PgRepository) CreateUser(ctx context.Context, email, passwordHash string) (domain.User, error) {
 	u, err := scanUser(r.pool.QueryRow(ctx, createUserQuery, email, passwordHash))
 	if err != nil {
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == ErrPgUniqueConstraintViolation {
+			return domain.User{}, domain.ErrAlreadyExists
+		}
 		return domain.User{}, fmt.Errorf("failed to create user: %w", err)
 	}
 

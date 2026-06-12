@@ -2,8 +2,11 @@ package domain
 
 import (
 	"context"
+	"strings"
 	"time"
 )
+
+const EmptyLocation = "" // for admins
 
 type Location struct {
 	Id         string    `json:"id"`
@@ -12,6 +15,14 @@ type Location struct {
 	Address    *string   `json:"address"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+// ValidateLocationName returns an error if the locationName is empty
+func ValidateLocationName(locationName string) error {
+	if strings.TrimSpace(locationName) == "" {
+		return NewValidationError("location name cannot be empty")
+	}
+	return nil
 }
 
 // Update struct (can be used for partial updates -> simply don't assign a field)

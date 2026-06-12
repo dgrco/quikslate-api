@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/dgrco/quikslate/internal/ctxkeys"
 	"github.com/dgrco/quikslate/internal/domain"
 )
 
@@ -17,16 +18,48 @@ func NewBusinessService(repo domain.Repo) *BusinessService {
 	}
 }
 
-func (bs *BusinessService) GetBusiness(ctx context.Context, userId, businessId string) (domain.Business, error) {
-	urole, err := bs.repo.GetUserRole(ctx, userId, businessId)
-	if err != nil {
-		return domain.Business{}, fmt.Errorf("failed to get user role: %w", err)
+// Get a Business.
+// Implicit parameters set by http context: {businessId}
+// (Authorization: admin)
+func (bs *BusinessService) GetBusiness(ctx context.Context) (domain.Business, error) {
+	if err := validateIsAdmin(ctx); err != nil {
+		return domain.Business{}, fmt.Errorf("failed to get business: %w", err)
 	}
+	businessId := ctxkeys.GetBusinessId(ctx)
 
-	if urole.Role != domain.AdminRole {
-		return domain.Business{}, domain.ErrUnauthorized
+	b, err := bs.repo.GetBusinessById(ctx, businessId)
+	if err != nil {
+		return domain.Business{}, fmt.Errorf("failed to get business: %w", err)
 	}
-	
-	// b, err := bs.repo.Get
-	return domain.Business{}, nil;
+	return b, nil
+}
+
+// Rename a Business.
+// Implicit parameters set by http context: {businessId}
+// (Authorization: admin)
+func (bs *BusinessService) RenameBusiness(ctx context.Context, businessName string) error {
+	if err := validateIsAdmin(ctx); err != nil {
+		return fmt.Errorf("failed to rename business: %w", err)
+	}
+	businessId := ctxkeys.GetBusinessId(ctx)
+
+	if err := bs.repo.ChangeBusinessName(ctx, businessId, businessName); err != nil {
+		return fmt.Errorf("failed to rename business: %w", err)
+	}
+	return nil
+}
+
+// Delete a Business.
+// Implicit parameters set by http context: {businessId}
+// (Authorization: admin)
+func (bs *BusinessService) DeleteBusiness(ctx context.Context) error {
+	if err := validateIsAdmin(ctx); err != nil {
+		return fmt.Errorf("failed to delete business: %w", err)
+	}
+	businessId := ctxkeys.GetBusinessId(ctx)
+
+	if err := bs.repo.DeleteBusiness(ctx, businessId); err != nil {
+		return fmt.Errorf("failed to delete business: %w", err)
+	}
+	return nil
 }

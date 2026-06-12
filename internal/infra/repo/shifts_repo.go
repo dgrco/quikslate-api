@@ -16,6 +16,11 @@ const (
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, user_id, location_id, position_id, status, start_time, end_time, created_at, updated_at
 	`
+	assignShiftQuery = `
+		UPDATE shifts
+		SET user_id = $1, status = 'assigned', updated_at = NOW()
+		WHERE id = $2
+	`
 	getShiftByIdQuery = `
 		SELECT id, user_id, location_id, position_id, status, start_time, end_time, created_at, updated_at
 		FROM shifts
@@ -144,6 +149,17 @@ func (r *PgRepository) UpdateShiftById(ctx context.Context, id string, update do
 		return fmt.Errorf("failed to update shift by ID: %w", err)
 	}
 	if cmdTag.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+func (r *PgRepository) AssignShift(ctx context.Context, id, userId string) error {
+	cmdTags, err := r.pool.Exec(ctx, assignShiftQuery, userId, id)
+	if err != nil {
+		return fmt.Errorf("failed to assign shift: %w", err)
+	}
+	if cmdTags.RowsAffected() == 0 {
 		return domain.ErrNotFound
 	}
 	return nil

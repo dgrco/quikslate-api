@@ -1,0 +1,19 @@
+flowchart LR
+    Issue["🎟 Tokens Issued\n──────────────\nAccess Token: 15min JWT\nRefresh Token: 30d stored in DB\n+ sent as HttpOnly cookie"]
+
+    Use["🌐 Authenticated Request\nAuthorization: Bearer access_token"]
+
+    MW["JWT Middleware\n──────────────\nVerify signature\nExtract claims into ctx:\n• userId\n• businessId\n• locationId\n• isAdmin\n• role"]
+
+    Expire["⏰ Access Token Expired"]
+
+    Refresh(["POST /auth/refresh\n──────────────\n1. Read cookie\n2. Verify token exists in DB\n3. Re-check user, business,\n   location still valid\n4. Rotate both tokens"])
+
+    Logout(["POST /auth/logout\n──────────────\n1. Delete token from DB\n2. Expire cookie\n   MaxAge: -1"])
+
+    Issue --> Use
+    Use --> MW
+    Use --> Expire
+    Expire --> Refresh
+    Refresh --> Issue
+    Use --> Logout

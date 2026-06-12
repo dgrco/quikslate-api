@@ -23,17 +23,22 @@ func (r *PgRepository) CreateUserWithBusiness(
 	}
 	defer tx.Rollback(ctx)
 
+	// create the user
 	u, err := scanUser(tx.QueryRow(ctx, createUserQuery, email, password))
 	if err != nil {
 		return domain.User{}, domain.Business{}, fmt.Errorf("failed to create user: %w", err)
 	}
 
+	// create the business
 	b, err := scanBusiness(tx.QueryRow(ctx, createBusinessQuery, businessName))
 	if err != nil {
 		return domain.User{}, domain.Business{}, fmt.Errorf("failed to create business: %w", err)
 	}
 
-	_, err = tx.Exec(ctx, assignRoleQuery, u.Id, b.Id, nil, domain.AdminRole)
+	// add the user to the business as an admin
+	if _, err = tx.Exec(ctx, addUserToBusinessQuery, u.Id, b.Id, true); err != nil {
+		return domain.User{}, domain.Business{}, fmt.Errorf("failed to assign admin role: %w", err)
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return domain.User{}, domain.Business{}, fmt.Errorf("failed to commit: %w", err)

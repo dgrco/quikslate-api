@@ -1,0 +1,131 @@
+package repo
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/dgrco/quikslate/internal/domain"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+)
+
+const (
+	createInviteQuery = `
+		INSERT INTO invites (token_hash, email, business_id, location_id, role, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, token_hash, email, business_id, location_id, role, expires_at, accepted_at, created_at, updated_at
+	`
+	getInviteFromTokenHashQuery = `
+		SELECT id, token_hash, email, business_id, location_id, role, expires_at, accepted_at, created_at, updated_at
+		FROM invites
+		WHERE token_hash = $1
+	`
+	getPendingInviteByEmailAndBusinessIdQuery = `
+		SELECT id, token_hash, email, business_id, location_id, role, expires_at, accepted_at, created_at, updated_at
+		FROM invites
+		WHERE email = $1 AND business_id = $2 AND accepted_at IS NULL
+	`
+	markInviteAcceptedQuery = `
+		UPDATE invites
+		SET accepted_at = NOW(), updated_at = NOW()
+		WHERE token_hash = $1
+	`
+)
+
+func scanInviteFields(inv *domain.Invite, scan func(...any) error) error {
+	if err := scan(
+		&inv.Id,
+		&inv.TokenHash,
+		&inv.Email,
+		&inv.BusinessId,
+		&inv.LocationId,
+		&inv.Role,
+		&inv.ExpiresAt,
+		&inv.AcceptedAt,
+		&inv.CreatedAt,
+		&inv.UpdatedAt,
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
+func scanInvite(row pgx.Row) (domain.Invite, error) {
+	var inv domain.Invite
+	if err := scanInviteFields(&inv, row.Scan); err != nil {
+		return domain.Invite{}, err
+	}
+	return inv, nil
+}
+
+func (r *PgRepository) CreateInvite(
+	ctx context.Context,
+	tokenHash,
+	email,
+	businessId,
+	locationId string,
+	role domain.LRole,
+	expiresAt time.Time,
+) (domain.Invite, error) {
+	inv, err := scanInvite(r.exec.QueryRow(ctx, createInviteQuery, tokenHash, email, businessId, locationId, role, expiresAt))
+	if err != nil {
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == ErrPgUniqueConstraintViolation {
+			return domain.Invite{}, domain.ErrAlreadyExists
+		}
+		return domain.Invite{}, fmt.Errorf("failed to create invite: %w", err)
+	}
+	return inv, nil
+}
+
+func (r *PgRepository) GetInviteByTokenHash(ctx context.Context, tokenHash string) (domain.Invite, error) {
+	inv, err := scanInvite(r.exec.QueryRow(ctx, getInviteFromTokenHashQuery, tokenHash))
+	if err != nil {
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return domain.Invite{}, domain.ErrNotFound
+		default:
+			return domain.Invite{}, fmt.Errorf("failed to get invite: %w", err)
+		}
+
+	}
+	return inv, nil
+}
+
+// GetPendingInviteByEmailAndBusinessId fetches the pending invite
+// between a user's email and a business (if it exists)
+// and returns the invite.
+// It is guaranteed that at most one such pending invite exists
+// due to the unique index created on the invites table
+// between (email, business_id) where accepted_at is NULL.
+func (r *PgRepository) GetPendingInviteByEmailAndBusinessId(
+	ctx context.Context,
+	email,
+	businessId string,
+) (domain.Invite, error) {
+	inv, err := scanInvite(r.exec.QueryRow(ctx, getPendingInviteByEmailAndBusinessIdQuery, email, businessId))
+	if err != nil {
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return domain.Invite{}, domain.ErrNotFound
+		default:
+			return domain.Invite{}, fmt.Errorf("failed to get pending invites: %w", err)
+		}
+	}
+
+	return inv, nil
+}
+
+func (r *PgRepository) MarkInviteAccepted(ctx context.Context, tokenHash string) error {
+	cmdTag, err := r.exec.Exec(ctx, markInviteAcceptedQuery, tokenHash)
+	if err != nil {
+		return fmt.Errorf("failed to mark invite as accepted: %w", err)
+	}
+	if cmdTag.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+var _ domain.InviteRepository = (*PgRepository)(nil)

@@ -73,7 +73,7 @@ func scanPositions(rows pgx.Rows) ([]domain.Position, error) {
 }
 
 func (r *PgRepository) CreatePosition(ctx context.Context, businessId, name string) (domain.Position, error) {
-	p, err := scanPosition(r.pool.QueryRow(ctx, createPositionQuery, businessId, name))
+	p, err := scanPosition(r.exec.QueryRow(ctx, createPositionQuery, businessId, name))
 	if err != nil {
 		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == ErrPgUniqueConstraintViolation {
 			return domain.Position{}, domain.ErrAlreadyExists
@@ -84,7 +84,7 @@ func (r *PgRepository) CreatePosition(ctx context.Context, businessId, name stri
 }
 
 func (r *PgRepository) GetPositionById(ctx context.Context, id string) (domain.Position, error) {
-	p, err := scanPosition(r.pool.QueryRow(ctx, getPositionByIdQuery, id))
+	p, err := scanPosition(r.exec.QueryRow(ctx, getPositionByIdQuery, id))
 	if err != nil {
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
@@ -97,7 +97,7 @@ func (r *PgRepository) GetPositionById(ctx context.Context, id string) (domain.P
 }
 
 func (r *PgRepository) GetPositionsByBusinessId(ctx context.Context, businessId string) ([]domain.Position, error) {
-	rows, err := r.pool.Query(ctx, getPositionsByBusinessIdQuery, businessId)
+	rows, err := r.exec.Query(ctx, getPositionsByBusinessIdQuery, businessId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get positions by business ID: %w", err)
 	}
@@ -111,8 +111,11 @@ func (r *PgRepository) GetPositionsByBusinessId(ctx context.Context, businessId 
 }
 
 func (r *PgRepository) ChangePositionName(ctx context.Context, id, name string) error {
-	cmdTag, err := r.pool.Exec(ctx, changePositionNameQuery, name, id)
+	cmdTag, err := r.exec.Exec(ctx, changePositionNameQuery, name, id)
 	if err != nil {
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == ErrPgUniqueConstraintViolation {
+			return domain.ErrAlreadyExists
+		}
 		return fmt.Errorf("failed to change position name: %w", err)
 	}
 	if cmdTag.RowsAffected() == 0 {
@@ -122,7 +125,7 @@ func (r *PgRepository) ChangePositionName(ctx context.Context, id, name string) 
 }
 
 func (r *PgRepository) DeletePosition(ctx context.Context, id string) error {
-	cmdTag, err := r.pool.Exec(ctx, deletePositionQuery, id)
+	cmdTag, err := r.exec.Exec(ctx, deletePositionQuery, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete position: %w", err)
 	}

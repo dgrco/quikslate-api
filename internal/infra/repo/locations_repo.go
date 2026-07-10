@@ -68,7 +68,7 @@ func scanLocations(rows pgx.Rows) ([]domain.Location, error) {
 }
 
 func (r *PgRepository) CreateLocation(ctx context.Context, businessId, name string, address *string) (domain.Location, error) {
-	l, err := scanLocation(r.pool.QueryRow(ctx, createLocationQuery, businessId, name, address))
+	l, err := scanLocation(r.exec.QueryRow(ctx, createLocationQuery, businessId, name, address))
 	if err != nil {
 		return domain.Location{}, fmt.Errorf("failed to create location: %w", err)
 	}
@@ -76,7 +76,7 @@ func (r *PgRepository) CreateLocation(ctx context.Context, businessId, name stri
 }
 
 func (r *PgRepository) GetLocationById(ctx context.Context, id string) (domain.Location, error) {
-	l, err := scanLocation(r.pool.QueryRow(ctx, getLocationByIdQuery, id))
+	l, err := scanLocation(r.exec.QueryRow(ctx, getLocationByIdQuery, id))
 	if err != nil {
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
@@ -89,7 +89,7 @@ func (r *PgRepository) GetLocationById(ctx context.Context, id string) (domain.L
 }
 
 func (r *PgRepository) GetLocationsByBusinessId(ctx context.Context, businessId string) ([]domain.Location, error) {
-	rows, err := r.pool.Query(ctx, getLocationsByBusinessIdQuery, businessId)
+	rows, err := r.exec.Query(ctx, getLocationsByBusinessIdQuery, businessId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get locations by business ID: %w", err)
 	}
@@ -118,7 +118,7 @@ func (r *PgRepository) UpdateLocationById(ctx context.Context, id string, update
 
 	query, args := builder.Build("locations", "id", id)
 
-	cmdTag, err := r.pool.Exec(ctx, query, args...)
+	cmdTag, err := r.exec.Exec(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update location: %w", err)
 	}
@@ -130,7 +130,7 @@ func (r *PgRepository) UpdateLocationById(ctx context.Context, id string, update
 }
 
 func (r *PgRepository) DeleteLocation(ctx context.Context, id string) error {
-	cmdTag, err := r.pool.Exec(ctx, deleteLocationQuery, id)
+	cmdTag, err := r.exec.Exec(ctx, deleteLocationQuery, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete location: %w", err)
 	}

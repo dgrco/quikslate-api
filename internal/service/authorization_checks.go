@@ -8,36 +8,24 @@ import (
 	"github.com/dgrco/quikslate/internal/domain"
 )
 
-// validateIsAdmin returns ErrUnauthorized if the requestor is not an admin.
+// validateIsAdmin returns ErrForbidden if the requestor is not an admin.
 func validateIsAdmin(ctx context.Context) error {
 	if !ctxkeys.GetIsAdmin(ctx) {
-		return domain.ErrUnauthorized
+		return domain.ErrForbidden
 	}
 	return nil
 }
 
-// validateLocationRole returns ErrUnauthorized if the requestor's role
-// is not in roles, or ErrNotFound if no location role exists.
-func validateLocationRole(ctx context.Context, repo domain.Repo, locationId string, roles []domain.LRole) error {
-	userId := ctxkeys.GetUserId(ctx)
-	lr, err := repo.GetLocationRole(ctx, userId, locationId)
-	if err != nil {
-		return domain.ErrNotFound
+// validateIsAdminOrLocationLead checks for admin access or a LocationLead session.
+// Admin-only sessions (no location) pass. LocationLead sessions pass if they have a location.
+func validateIsAdminOrLocationLead(ctx context.Context) error {
+	if ctxkeys.GetIsAdmin(ctx) {
+		return nil
 	}
-	if !slices.Contains(roles, lr.Role) {
-		return domain.ErrUnauthorized
+	if ctxkeys.GetRole(ctx) == domain.LocationLead && ctxkeys.GetLocationId(ctx) != "" {
+		return nil
 	}
-	return nil
-}
-
-// validateAdminOrLocationRole passes if the requestor is an admin,
-// otherwise delegates to validateLocationRole.
-// Note: admins are not required to have a location role.
-func validateAdminOrLocationRole(ctx context.Context, repo domain.Repo, locationId string, roles []domain.LRole) error {
-    if ctxkeys.GetIsAdmin(ctx) {
-        return nil
-    }
-    return validateLocationRole(ctx, repo, locationId, roles)
+	return domain.ErrForbidden
 }
 
 // getAndValidateLocation returns the Location if it belongs to the requestor's
@@ -53,10 +41,10 @@ func getAndValidateLocation(
 	}
 	// Check if the Location's business ID matches the business ID set in the context (the user's business ID)
 	if l.BusinessId != ctxkeys.GetBusinessId(ctx) {
-		return domain.Location{}, domain.ErrNotFound
+		return domain.Location{}, domain.ErrForbidden
 	}
 	if !ctxkeys.GetIsAdmin(ctx) && l.Id != ctxkeys.GetLocationId(ctx) {
-		return domain.Location{}, domain.ErrNotFound
+		return domain.Location{}, domain.ErrForbidden
 	}
 
 	return l, nil
@@ -73,7 +61,7 @@ func getAndValidatePosition(
 		return domain.Position{}, err
 	}
 	if p.BusinessId != ctxkeys.GetBusinessId(ctx) {
-		return domain.Position{}, domain.ErrNotFound
+		return domain.Position{}, domain.ErrForbidden
 	}
 
 	return p, nil
@@ -94,4 +82,66 @@ func getAndValidateShift(
 	}
 
 	return s, nil
+}
+
+// requireLocationRole enforces a location-scoped session.
+// This rejects identity-only AND admin-only sessions, since
+// neither has an active location.
+// It also enforces the caller's role is one of the 'roles' listed
+// unless they are an admin.
+// Use for single-location-scoped resources.
+func requireLocationRole(ctx context.Context, roles ...domain.LRole) (string, error) {
+	locationId := ctxkeys.GetLocationId(ctx)
+	if locationId == "" {
+		return "", domain.ErrForbidden
+	}
+	if ctxkeys.GetIsAdmin(ctx) {
+		return locationId, nil
+	}
+	if slices.Contains(roles, ctxkeys.GetRole(ctx)) {
+		return locationId, nil
+	}
+	return "", domain.ErrForbidden
+}
+
+// requireAdminOrManagerAtOwnLocation enforces business-wide admin access, or
+// a Manager acting within their own location. Unlike requireLocationRole, an
+// admin-only session (no location) is allowed here: positions are a
+// business-wide concept, only a Manager's authority over them is 
+// location-limited. Return the caller's own locationId when the caller is a
+// non-admin Manager (empty string for admins), for use in a follow-up check
+// against the target resource.
+// Use for employee-position assignment.
+func requireAdminOrManagerAtOwnLocation(ctx context.Context) (string, error) {
+	if ctxkeys.GetIsAdmin(ctx) {
+		return "", nil
+	}
+	role := ctxkeys.GetRole(ctx)
+	if role != domain.Manager && role != domain.LocationLead {
+		return "", domain.ErrForbidden
+	}
+	locationId := ctxkeys.GetLocationId(ctx)
+	if locationId == "" {
+		return "", domain.ErrForbidden
+	}
+	return locationId, nil
+}
+
+// canActOnRole determines if the caller is authorized to act on
+// a target's role (ensures hierarchical control)
+func canActOnRole(callerRole, targetRole domain.LRole) bool {
+	// Business admins can schedule anyone
+	if callerRole == domain.EmptyRole {
+		return true
+	}
+	// LocationLead can schedule managers and employees
+	if callerRole == domain.LocationLead {
+		return targetRole == domain.Manager || targetRole == domain.Employee
+	}
+	// Manager can only schedule employees
+	if callerRole == domain.Manager {
+		return targetRole == domain.Employee
+	}
+	// Employee can't schedule anyone (shouldn't reach here anyway)
+	return false
 }

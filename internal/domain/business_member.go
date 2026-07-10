@@ -6,11 +6,11 @@ import (
 )
 
 type BusinessMember struct {
-	UserId     string    `json:"user_id"`
-	BusinessId string    `json:"business_id"`
-	IsAdmin    bool      `json:"is_admin"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	UserId           string     `json:"user_id"`
+	BusinessId       string     `json:"business_id"`
+	IsAdmin          bool       `json:"is_admin"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
 }
 
 type BusinessMemberRepository interface {

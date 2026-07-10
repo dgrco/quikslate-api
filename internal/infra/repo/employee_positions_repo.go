@@ -55,7 +55,7 @@ func scanEmployeePositions(rows pgx.Rows) ([]domain.EmployeePosition, error) {
 }
 
 func (r *PgRepository) AddPosition(ctx context.Context, userId, positionId string) error {
-	_, err := r.pool.Exec(ctx, addPositionQuery, userId, positionId)
+	_, err := r.exec.Exec(ctx, addPositionQuery, userId, positionId)
 	if err != nil {
 		return fmt.Errorf("failed to add employee position: %w", err)
 	}
@@ -63,7 +63,7 @@ func (r *PgRepository) AddPosition(ctx context.Context, userId, positionId strin
 }
 
 func (r *PgRepository) RemovePosition(ctx context.Context, userId, positionId string) error {
-	cmdTag, err := r.pool.Exec(ctx, removePositionQuery, userId, positionId)
+	cmdTag, err := r.exec.Exec(ctx, removePositionQuery, userId, positionId)
 	if err != nil {
 		return fmt.Errorf("failed to remove employee position: %w", err)
 	}
@@ -74,7 +74,7 @@ func (r *PgRepository) RemovePosition(ctx context.Context, userId, positionId st
 }
 
 func (r *PgRepository) GetPositionsByUserId(ctx context.Context, userId string) ([]domain.EmployeePosition, error) {
-	rows, err := r.pool.Query(ctx, getPositionsByUserIdQuery, userId)
+	rows, err := r.exec.Query(ctx, getPositionsByUserIdQuery, userId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get employee positions by user ID: %w", err)
 	}

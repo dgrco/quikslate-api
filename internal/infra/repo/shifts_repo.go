@@ -93,7 +93,7 @@ func (r *PgRepository) CreateShift(
 	status domain.ShiftStatus,
 	startTime, endTime time.Time,
 ) (domain.Shift, error) {
-	s, err := scanShift(r.pool.QueryRow(ctx, createShiftQuery, userId, locationId, positionId, status, startTime, endTime))
+	s, err := scanShift(r.exec.QueryRow(ctx, createShiftQuery, userId, locationId, positionId, status, startTime, endTime))
 	if err != nil {
 		return domain.Shift{}, fmt.Errorf("failed to create shift: %w", err)
 	}
@@ -101,7 +101,7 @@ func (r *PgRepository) CreateShift(
 }
 
 func (r *PgRepository) GetShiftById(ctx context.Context, id string) (domain.Shift, error) {
-	s, err := scanShift(r.pool.QueryRow(ctx, getShiftByIdQuery, id))
+	s, err := scanShift(r.exec.QueryRow(ctx, getShiftByIdQuery, id))
 	if err != nil {
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
@@ -114,7 +114,7 @@ func (r *PgRepository) GetShiftById(ctx context.Context, id string) (domain.Shif
 }
 
 func (r *PgRepository) GetShiftsByLocationId(ctx context.Context, locationId string) ([]domain.Shift, error) {
-	rows, err := r.pool.Query(ctx, getShiftsByLocationIdQuery, locationId)
+	rows, err := r.exec.Query(ctx, getShiftsByLocationIdQuery, locationId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get shifts by location ID: %w", err)
 	}
@@ -144,7 +144,7 @@ func (r *PgRepository) UpdateShiftById(ctx context.Context, id string, update do
 	}
 
 	query, args := builder.Build("shifts", "id", id)
-	cmdTag, err := r.pool.Exec(ctx, query, args...)
+	cmdTag, err := r.exec.Exec(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update shift by ID: %w", err)
 	}
@@ -155,7 +155,7 @@ func (r *PgRepository) UpdateShiftById(ctx context.Context, id string, update do
 }
 
 func (r *PgRepository) AssignShift(ctx context.Context, id, userId string) error {
-	cmdTags, err := r.pool.Exec(ctx, assignShiftQuery, userId, id)
+	cmdTags, err := r.exec.Exec(ctx, assignShiftQuery, userId, id)
 	if err != nil {
 		return fmt.Errorf("failed to assign shift: %w", err)
 	}
@@ -166,7 +166,7 @@ func (r *PgRepository) AssignShift(ctx context.Context, id, userId string) error
 }
 
 func (r *PgRepository) UnassignShift(ctx context.Context, id string) error {
-	cmdTag, err := r.pool.Exec(ctx, unassignShiftQuery, id)
+	cmdTag, err := r.exec.Exec(ctx, unassignShiftQuery, id)
 	if err != nil {
 		return fmt.Errorf("failed to unassign shift: %w", err)
 	}
@@ -178,7 +178,7 @@ func (r *PgRepository) UnassignShift(ctx context.Context, id string) error {
 
 // Soft-delete a shift (use this over DeleteShift most of the time)
 func (r *PgRepository) CancelShift(ctx context.Context, id string) error {
-	cmdTag, err := r.pool.Exec(ctx, cancelShiftQuery, id)
+	cmdTag, err := r.exec.Exec(ctx, cancelShiftQuery, id)
 	if err != nil {
 		return fmt.Errorf("failed to cancel shift: %w", err)
 	}
@@ -190,7 +190,7 @@ func (r *PgRepository) CancelShift(ctx context.Context, id string) error {
 
 // Hard-delete a shift (should only be used for admin purposes)
 func (r *PgRepository) DeleteShift(ctx context.Context, id string) error {
-	cmdTag, err := r.pool.Exec(ctx, deleteShiftQuery, id)
+	cmdTag, err := r.exec.Exec(ctx, deleteShiftQuery, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete shift: %w", err)
 	}

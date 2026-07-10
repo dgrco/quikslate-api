@@ -23,16 +23,28 @@ func NewEmployeeService(repo domain.Repo) *EmployeeService {
 func (es *EmployeeService) AddPosition(
 	ctx context.Context,
 	userId,
-	locationId,
 	positionId string,
 ) error {
-	// validate the requestor has authorization
-	if err := validateAdminOrLocationRole(ctx, es.repo, locationId, []domain.LRole{domain.Manager}); err != nil {
+	callerLocationId, err := requireAdminOrManagerAtOwnLocation(ctx)
+	if err != nil {
 		return fmt.Errorf("failed to add position to employee: %w", err)
 	}
 
-	// check if userId belongs to the same business
-	_, err := es.repo.GetBusinessMember(ctx, userId, ctxkeys.GetBusinessId(ctx))
+	// check if userId belongs to the same business (for admin callers)
+	bm, err := es.repo.GetBusinessMember(ctx, userId, ctxkeys.GetBusinessId(ctx))
+	if err != nil {
+		return fmt.Errorf("failed to add position to employee: %w", err)
+	}
+
+	if callerLocationId != "" {
+		// verify manager works at the same location as the target
+		if _, err := es.repo.GetLocationRole(ctx, userId, callerLocationId, bm.BusinessId); err != nil {
+			return fmt.Errorf("failed to add position to employee: %w", err)
+		}
+	}
+
+	// verify positionId belongs to the caller's business
+	_, err = getAndValidatePosition(ctx, es.repo, positionId)
 	if err != nil {
 		return fmt.Errorf("failed to add position to employee: %w", err)
 	}
@@ -48,19 +60,31 @@ func (es *EmployeeService) AddPosition(
 // (Authorization: Admin, Manager)
 func (es *EmployeeService) RemovePosition(
 	ctx context.Context,
-	locationId,
 	userId,
 	positionId string,
 ) error {
-	// validate the requestor has authorization
-	if err := validateAdminOrLocationRole(ctx, es.repo, locationId, []domain.LRole{domain.Manager}); err != nil {
+	callerLocationId, err := requireAdminOrManagerAtOwnLocation(ctx)
+	if err != nil {
 		return fmt.Errorf("failed to remove position from employee: %w", err)
 	}
 
-	// check if userId belongs to the same business
-	_, err := es.repo.GetBusinessMember(ctx, userId, ctxkeys.GetBusinessId(ctx))
+	// check if userId belongs to the same business (for admin callers)
+	bm, err := es.repo.GetBusinessMember(ctx, userId, ctxkeys.GetBusinessId(ctx))
 	if err != nil {
 		return fmt.Errorf("failed to remove position from employee: %w", err)
+	}
+
+	if callerLocationId != "" {
+		// verify manager works at the same location as the target
+		if _, err := es.repo.GetLocationRole(ctx, userId, callerLocationId, bm.BusinessId); err != nil {
+			return fmt.Errorf("failed to add position to employee: %w", err)
+		}
+	}
+	
+	// verify positionId belongs to the caller's business
+	_, err = getAndValidatePosition(ctx, es.repo, positionId)
+	if err != nil {
+		return fmt.Errorf("failed to add position to employee: %w", err)
 	}
 
 	if err := es.repo.RemovePosition(ctx, userId, positionId); err != nil {
@@ -74,18 +98,24 @@ func (es *EmployeeService) RemovePosition(
 // (Authorization: Admin, Manager)
 func (es *EmployeeService) GetAllPositionsByUser(
 	ctx context.Context,
-	locationId,
 	userId string,
 ) ([]domain.EmployeePosition, error) {
-	// validate the requestor has authorization
-	if err := validateAdminOrLocationRole(ctx, es.repo, locationId, []domain.LRole{domain.Manager}); err != nil {
+	callerLocationId, err := requireAdminOrManagerAtOwnLocation(ctx)
+	if err != nil {
 		return nil, fmt.Errorf("failed to get all positions by user: %w", err)
 	}
 
-	// check if userId belongs to the same business
-	_, err := es.repo.GetBusinessMember(ctx, userId, ctxkeys.GetBusinessId(ctx))
+	// check if userId belongs to the same business (for admin callers)
+	bm, err := es.repo.GetBusinessMember(ctx, userId, ctxkeys.GetBusinessId(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all positions by user: %w", err)
+	}
+
+	if callerLocationId != "" {
+		// verify manager works at the same location as the target
+		if _, err := es.repo.GetLocationRole(ctx, userId, callerLocationId, bm.BusinessId); err != nil {
+			return nil, fmt.Errorf("failed to add position to employee: %w", err)
+		}
 	}
 
 	positions, err := es.repo.GetPositionsByUserId(ctx, userId)

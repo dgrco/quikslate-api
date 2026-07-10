@@ -18,7 +18,7 @@ const (
 	getLocationRoleQuery = `
 		SELECT user_id, business_id, location_id, role, created_at, updated_at
 		FROM location_roles
-		WHERE user_id = $1 AND location_id = $2
+		WHERE user_id = $1 AND location_id = $2 AND business_id = $3
 	`
 	getLocationRolesByUserAndBusinessQuery = `
 		SELECT user_id, business_id, location_id, role, created_at, updated_at
@@ -66,7 +66,7 @@ func scanLocationRoles(rows pgx.Rows) ([]domain.LocationRole, error) {
 }
 
 func (r *PgRepository) AssignRole(ctx context.Context, userId, businessId string, locationId string, role domain.LRole) error {
-	_, err := r.pool.Exec(ctx, assignRoleQuery, userId, businessId, locationId, role)
+	_, err := r.exec.Exec(ctx, assignRoleQuery, userId, businessId, locationId, role)
 	if err != nil {
 		return fmt.Errorf("failed to assign role: %w", err)
 	}
@@ -74,8 +74,8 @@ func (r *PgRepository) AssignRole(ctx context.Context, userId, businessId string
 	return nil
 }
 
-func (r *PgRepository) GetLocationRole(ctx context.Context, userId, locationId string) (domain.LocationRole, error) {
-	urole, err := scanLocationRole(r.pool.QueryRow(ctx, getLocationRoleQuery, userId, locationId))
+func (r *PgRepository) GetLocationRole(ctx context.Context, userId, locationId, businessId string) (domain.LocationRole, error) {
+	urole, err := scanLocationRole(r.exec.QueryRow(ctx, getLocationRoleQuery, userId, locationId, businessId))
 	if err != nil {
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
@@ -89,7 +89,7 @@ func (r *PgRepository) GetLocationRole(ctx context.Context, userId, locationId s
 }
 
 func (r *PgRepository) GetLocationRolesByUserAndBusiness(ctx context.Context, userId, businessId string) ([]domain.LocationRole, error) {
-	rows, err := r.pool.Query(ctx, getLocationRolesByUserAndBusinessQuery, userId, businessId)
+	rows, err := r.exec.Query(ctx, getLocationRolesByUserAndBusinessQuery, userId, businessId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get location roles by user and business IDs: %w", err)
 	}
@@ -104,7 +104,7 @@ func (r *PgRepository) GetLocationRolesByUserAndBusiness(ctx context.Context, us
 }
 
 func (r *PgRepository) RemoveRole(ctx context.Context, userId, locationId string) error {
-	cmdTag, err := r.pool.Exec(ctx, deleteLocationRoleQuery, userId, locationId)
+	cmdTag, err := r.exec.Exec(ctx, deleteLocationRoleQuery, userId, locationId)
 	if err != nil {
 		return fmt.Errorf("failed to remove role: %w", err)
 	}

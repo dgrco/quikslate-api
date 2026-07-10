@@ -14,6 +14,7 @@ const (
 	addUserToBusinessQuery = `
 		INSERT INTO business_members (user_id, business_id, is_admin)
 		VALUES ($1, $2, $3)
+		ON CONFLICT (user_id, business_id) DO NOTHING
 	`
 	getBusinessMemberQuery = `
 		SELECT user_id, business_id, is_admin, created_at, updated_at
@@ -36,10 +37,11 @@ const (
 	`
 	// used in removing user to prevent removal of last admin
 	getAdminCountQuery = `
-		SELECT COUNT(*)
-		FROM business_members
-		WHERE business_id = $1 AND is_admin = TRUE
-		FOR UPDATE
+		SELECT COUNT(*) FROM (
+			SELECT 1 FROM business_members
+			WHERE business_id = $1 AND is_admin = TRUE
+			FOR UPDATE
+		) locked_admins
 	`
 )
 
@@ -76,8 +78,8 @@ func scanBusinessMembers(rows pgx.Rows) ([]domain.BusinessMember, error) {
 	return businessMembers, nil
 }
 
-func (pg *PgRepository) AddUserToBusiness(ctx context.Context, userId, businessId string, isAdmin bool) error {
-	if _, err := pg.pool.Exec(ctx, addUserToBusinessQuery, userId, businessId, isAdmin); err != nil {
+func (r *PgRepository) AddUserToBusiness(ctx context.Context, userId, businessId string, isAdmin bool) error {
+	if _, err := r.exec.Exec(ctx, addUserToBusinessQuery, userId, businessId, isAdmin); err != nil {
 		// Check if there is a duplicate
 		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == ErrPgUniqueConstraintViolation {
 			return domain.ErrAlreadyExists
@@ -87,8 +89,8 @@ func (pg *PgRepository) AddUserToBusiness(ctx context.Context, userId, businessI
 	return nil
 }
 
-func (pg *PgRepository) GetBusinessMember(ctx context.Context, userId, businessId string) (domain.BusinessMember, error) {
-	bm, err := scanBusinessMember(pg.pool.QueryRow(ctx, getBusinessMemberQuery, userId, businessId))
+func (r *PgRepository) GetBusinessMember(ctx context.Context, userId, businessId string) (domain.BusinessMember, error) {
+	bm, err := scanBusinessMember(r.exec.QueryRow(ctx, getBusinessMemberQuery, userId, businessId))
 	if err != nil {
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
@@ -100,8 +102,8 @@ func (pg *PgRepository) GetBusinessMember(ctx context.Context, userId, businessI
 	return bm, nil
 }
 
-func (pg *PgRepository) GetBusinessMembersByUserId(ctx context.Context, userId string) ([]domain.BusinessMember, error) {
-	rows, err := pg.pool.Query(ctx, getBusinessMembersByUserIdQuery, userId)
+func (r *PgRepository) GetBusinessMembersByUserId(ctx context.Context, userId string) ([]domain.BusinessMember, error) {
+	rows, err := r.exec.Query(ctx, getBusinessMembersByUserIdQuery, userId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get business members by user ID: %w", err)
 	}
@@ -115,8 +117,8 @@ func (pg *PgRepository) GetBusinessMembersByUserId(ctx context.Context, userId s
 	return businessMembers, nil
 }
 
-func (pg *PgRepository) SetAdminForBusinessMember(ctx context.Context, userId, businessId string, admin bool) error {
-	cmdTags, err := pg.pool.Exec(ctx, setAdminForBusinessMemberQuery, userId, businessId, admin)
+func (r *PgRepository) SetAdminForBusinessMember(ctx context.Context, userId, businessId string, admin bool) error {
+	cmdTags, err := r.exec.Exec(ctx, setAdminForBusinessMemberQuery, userId, businessId, admin)
 	if err != nil {
 		return fmt.Errorf("failed to set admin for business member: %w", err)
 	}
@@ -128,9 +130,9 @@ func (pg *PgRepository) SetAdminForBusinessMember(ctx context.Context, userId, b
 
 // RemoveUserFromBusiness deletes a user if it does not break the constraint: there must be
 // at least one admin per business.
-func (pg *PgRepository) RemoveUserFromBusiness(ctx context.Context, userId, businessId string) error {
+func (r *PgRepository) RemoveUserFromBusiness(ctx context.Context, userId, businessId string) error {
 	// ensure last admin is not removable
-	tx, err := pg.pool.Begin(ctx)
+	tx, err := r.beginPgxTx(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to remove user from business: %w", err)
 	}

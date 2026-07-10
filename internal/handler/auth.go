@@ -9,30 +9,26 @@ import (
 	"time"
 
 	"github.com/dgrco/quikslate/internal/domain"
+	"github.com/dgrco/quikslate/internal/middleware"
 	"github.com/dgrco/quikslate/internal/response"
 	"github.com/dgrco/quikslate/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/httprate"
 )
 
-const (
-	ERR_INVALID_REQ_BODY      = "invalid request body"
-	ERR_INTERNAL_SERVER       = "internal server error"
-	ERR_NOT_FOUND             = "not found"
-	ERR_INVALID_REFRESH_TOKEN = "invalid refresh token"
-)
-
 type AuthHandler struct {
 	authService *service.AuthService
 	secure      bool // should be true in production and false in development (set in Config.SecureMode)
+	jwtSecret string
 }
 
 // NewAuthHandler creates an AuthHandler object.
 // The secure parameter refers to whether we are in a prod or dev environment.
-func NewAuthHandler(authService *service.AuthService, secure bool) *AuthHandler {
+func NewAuthHandler(authService *service.AuthService, secure bool, jwtSecret string) *AuthHandler {
 	return &AuthHandler{
 		authService,
 		secure,
+		jwtSecret,
 	}
 }
 
@@ -40,8 +36,8 @@ func NewAuthHandler(authService *service.AuthService, secure bool) *AuthHandler 
 
 type registerRequest struct {
 	Email        string `json:"email"`
+	Name				 string `json:"name"`
 	Password     string `json:"password"`
-	BusinessName string `json:"business_name"`
 }
 
 type loginRequest struct {
@@ -50,28 +46,21 @@ type loginRequest struct {
 }
 
 type selectBusinessRequest struct {
-	UserId     string `json:"user_id"`
 	BusinessId string `json:"business_id"`
 }
 
 type selectLocationRequest struct {
-	UserId     string `json:"user_id"`
 	BusinessId string `json:"business_id"`
 	LocationId string `json:"location_id"`
 }
 
 // Response Structures
 
-type SimpleResponse struct {
-	Message string `json:"message"`
-}
-
 type TokenResponse struct {
 	AccessToken string `json:"access_token"`
 }
 
 type LocationSelectionResponse struct {
-	UserId     string   `json:"user_id"`
 	BusinessId string   `json:"business_id"`
 	Locations  []string `json:"locations"`
 }
@@ -85,8 +74,7 @@ func isEmpty(str string) bool {
 // Handlers
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
-	const maxBodySize = 1 * 1024 * 1024 // 1 MB
-	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
 	var req registerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -95,12 +83,12 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// validate request
-	if isEmpty(req.Email) || isEmpty(req.Password) || isEmpty(req.BusinessName) {
-		response.WriteError(w, "email, password, and business_id are required", http.StatusBadRequest)
+	if isEmpty(req.Email) || isEmpty(req.Name) || isEmpty(req.Password) {
+		response.WriteError(w, "email, name, and password are required", http.StatusBadRequest)
 		return
 	}
 
-	authResponse, err := h.authService.Register(r.Context(), req.Email, req.Password, req.BusinessName)
+	authResult, err := h.authService.Register(r.Context(), req.Email, req.Name, req.Password)
 	if err != nil {
 		var validationErr *domain.ValidationError
 		switch {
@@ -115,13 +103,12 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	setRefreshTokenCookie(w, authResponse.RefreshToken, h.secure)
-	response.WriteJSON(w, TokenResponse{AccessToken: authResponse.AccessToken}, http.StatusOK)
+	setRefreshTokenCookie(w, authResult.RefreshToken, h.secure)
+	response.WriteJSON(w, TokenResponse{AccessToken: authResult.AccessToken}, http.StatusOK)
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	const maxBodySize = 1 * 1024 * 1024 // 1 MB
-	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -135,7 +122,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authResponse, err := h.authService.Login(r.Context(), req.Email, req.Password)
+	authResult, err := h.authService.Login(r.Context(), req.Email, req.Password)
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrInvalidCredentials):
@@ -147,24 +134,23 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if authResponse.RequiresBusinessSelection {
+	if authResult.RequiresBusinessSelection {
 		// return businesses list + UserId, do NOT set cookie
-		response.WriteJSON(w, authResponse, http.StatusOK)
+		response.WriteJSON(w, authResult, http.StatusOK)
 		return
 	}
-	if authResponse.RequiresLocationSelection {
+	if authResult.RequiresLocationSelection {
 		// return locations list, do NOT set cookie
-		response.WriteJSON(w, authResponse, http.StatusOK)
+		response.WriteJSON(w, authResult, http.StatusOK)
 		return
 	}
 	// set cookie if fully authenticated
-	setRefreshTokenCookie(w, authResponse.RefreshToken, h.secure)
-	response.WriteJSON(w, TokenResponse{AccessToken: authResponse.AccessToken}, http.StatusOK)
+	setRefreshTokenCookie(w, authResult.RefreshToken, h.secure)
+	response.WriteJSON(w, TokenResponse{AccessToken: authResult.AccessToken}, http.StatusOK)
 }
 
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
-	const maxBodySize = 1 * 1024 * 1024 // 1 MB
-	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
 	cookie, err := r.Cookie("refresh_token")
 	if err != nil {
@@ -173,7 +159,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	}
 	refreshToken := cookie.Value
 
-	authResponse, err := h.authService.Refresh(r.Context(), refreshToken)
+	authResult, err := h.authService.Refresh(r.Context(), refreshToken)
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrInvalidRefreshToken):
@@ -185,13 +171,12 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setRefreshTokenCookie(w, authResponse.RefreshToken, h.secure)
-	response.WriteJSON(w, TokenResponse{AccessToken: authResponse.AccessToken}, http.StatusOK)
+	setRefreshTokenCookie(w, authResult.RefreshToken, h.secure)
+	response.WriteJSON(w, TokenResponse{AccessToken: authResult.AccessToken}, http.StatusOK)
 }
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	const maxBodySize = 1 * 1024 * 1024 // 1 MB
-	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
 	clearCookie := func() {
 		http.SetCookie(w, &http.Cookie{
@@ -226,8 +211,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) SelectBusiness(w http.ResponseWriter, r *http.Request) {
-	const maxBodySize = 1 * 1024 * 1024 // 1 MB
-	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
 	var req selectBusinessRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -236,12 +220,12 @@ func (h *AuthHandler) SelectBusiness(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// validate request
-	if isEmpty(req.UserId) || isEmpty(req.BusinessId) {
-		response.WriteError(w, "user_id and business_id are required", http.StatusBadRequest)
+	if isEmpty(req.BusinessId) {
+		response.WriteError(w, "business_id is required", http.StatusBadRequest)
 		return
 	}
 
-	authResponse, err := h.authService.SelectBusiness(r.Context(), req.UserId, req.BusinessId)
+	authResult, err := h.authService.SelectBusiness(r.Context(), req.BusinessId)
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrNotFound):
@@ -253,23 +237,22 @@ func (h *AuthHandler) SelectBusiness(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !authResponse.RequiresLocationSelection {
+	if !authResult.RequiresLocationSelection {
 		// no need to select a location
-		setRefreshTokenCookie(w, authResponse.RefreshToken, h.secure)
-		response.WriteJSON(w, TokenResponse{AccessToken: authResponse.AccessToken}, http.StatusOK)
+		setRefreshTokenCookie(w, authResult.RefreshToken, h.secure)
+		response.WriteJSON(w, TokenResponse{AccessToken: authResult.AccessToken}, http.StatusOK)
 		return
 	}
 
 	// return a location selection response
 	locationList := []string{}
-	for _, lr := range authResponse.Locations {
+	for _, lr := range authResult.Locations {
 		locationList = append(locationList, lr.LocationId)
 	}
 
 	response.WriteJSON(
 		w,
 		LocationSelectionResponse{
-			UserId:     req.UserId,
 			BusinessId: req.BusinessId,
 			Locations:  locationList,
 		},
@@ -278,8 +261,7 @@ func (h *AuthHandler) SelectBusiness(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) SelectLocation(w http.ResponseWriter, r *http.Request) {
-	const maxBodySize = 1 * 1024 * 1024 // 1 MB
-	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
 	var req selectLocationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -288,12 +270,12 @@ func (h *AuthHandler) SelectLocation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// validate request
-	if isEmpty(req.UserId) || isEmpty(req.BusinessId) || isEmpty(req.LocationId) {
-		response.WriteError(w, "user_id, business_id, and location_id are required", http.StatusBadRequest)
+	if isEmpty(req.BusinessId) || isEmpty(req.LocationId) {
+		response.WriteError(w, "business_id and location_id are required", http.StatusBadRequest)
 		return
 	}
 
-	authResponse, err := h.authService.SelectLocation(r.Context(), req.UserId, req.BusinessId, req.LocationId)
+	authResult, err := h.authService.SelectLocation(r.Context(), req.BusinessId, req.LocationId)
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrNotFound):
@@ -305,8 +287,8 @@ func (h *AuthHandler) SelectLocation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setRefreshTokenCookie(w, authResponse.RefreshToken, h.secure)
-	response.WriteJSON(w, TokenResponse{AccessToken: authResponse.AccessToken}, http.StatusOK)
+	setRefreshTokenCookie(w, authResult.RefreshToken, h.secure)
+	response.WriteJSON(w, TokenResponse{AccessToken: authResult.AccessToken}, http.StatusOK)
 }
 
 func setRefreshTokenCookie(w http.ResponseWriter, token string, secure bool) {
@@ -333,7 +315,11 @@ func (h *AuthHandler) SetupRoutes(r chi.Router) {
 
 		r.Post("/refresh", h.Refresh)
 		r.Post("/logout", h.Logout)
-		r.Post("/select-business", h.SelectBusiness)
-		r.Post("/select-location", h.SelectLocation)
+
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.AccessAuthMiddleware(h.jwtSecret))
+			r.Post("/select-business", h.SelectBusiness)
+			r.Post("/select-location", h.SelectLocation)
+		})
 	})
 }

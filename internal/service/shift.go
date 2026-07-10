@@ -20,22 +20,17 @@ func NewShiftService(repo domain.Repo) *ShiftService {
 }
 
 // Create a new Shift given locationId, positionId, status, startTime, and endTime
-// (Authorization: Admin, Manager)
+// (Authorization: Admin, LocationLead, Manager)
 func (ss *ShiftService) CreateShift(
 	ctx context.Context,
-	locationId, // this is explicit because admins don't have locationIds
 	positionId string,
 	userId *string,
 	status domain.ShiftStatus,
 	startTime,
 	endTime time.Time,
 ) (domain.Shift, error) {
-	if err := validateAdminOrLocationRole(ctx, ss.repo, locationId, []domain.LRole{domain.Manager}); err != nil {
-		return domain.Shift{}, fmt.Errorf("failed to create shift: %w", err)
-	}
-
-	// Validate the location belongs to the user's business
-	if _, err := getAndValidateLocation(ctx, ss.repo, locationId); err != nil {
+	locationId, err := requireLocationRole(ctx, domain.Manager, domain.LocationLead)
+	if err != nil {
 		return domain.Shift{}, fmt.Errorf("failed to create shift: %w", err)
 	}
 
@@ -46,10 +41,22 @@ func (ss *ShiftService) CreateShift(
 
 	if userId != nil {
 		// check if userId belongs to businessId
-		_, err := ss.repo.GetBusinessMember(ctx, *userId, ctxkeys.GetBusinessId(ctx))
+		bm, err := ss.repo.GetBusinessMember(ctx, *userId, ctxkeys.GetBusinessId(ctx))
 		if err != nil {
 			return domain.Shift{}, fmt.Errorf("failed to create shift: %w", err)
 		}
+		// check is the caller is permitted to assign a shift to the target userId
+		if !ctxkeys.GetIsAdmin(ctx) {
+			locId := ctxkeys.GetLocationId(ctx)
+			targetLocationRole, err := ss.repo.GetLocationRole(ctx, *userId, locId, bm.BusinessId)
+			if err != nil {
+				return domain.Shift{}, fmt.Errorf("failed to assign shift: %w", err)
+			}
+			if !canActOnRole(ctxkeys.GetRole(ctx), targetLocationRole.Role) {
+				return domain.Shift{}, domain.ErrUnauthorized
+			}
+		}
+
 	}
 
 	if err := domain.ValidateShiftTimes(startTime, endTime); err != nil {
@@ -83,12 +90,12 @@ func (ss *ShiftService) GetShift(
 // (Authorization: All)
 func (ss *ShiftService) GetShiftsByLocation(
 	ctx context.Context,
-	locationId string,
 ) ([]domain.Shift, error) {
-	// Validate the location belongs to the user's business and is in scope
-	if _, err := getAndValidateLocation(ctx, ss.repo, locationId); err != nil {
+	locationId, err := requireLocationRole(ctx, domain.Manager, domain.Employee)
+	if err != nil {
 		return nil, fmt.Errorf("failed to get shifts by location: %w", err)
 	}
+
 	shifts, err := ss.repo.GetShiftsByLocationId(ctx, locationId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get shifts by location: %w", err)
@@ -99,7 +106,7 @@ func (ss *ShiftService) GetShiftsByLocation(
 
 // Update Shift by shiftId using a ShiftUpdate object
 // This includes updating any of: status, start time, and/or end time.
-// (Authorization: Admin, Manager)
+// (Authorization: Admin, LocationLead, Manager)
 func (ss *ShiftService) UpdateShift(
 	ctx context.Context,
 	shiftId string,
@@ -109,9 +116,27 @@ func (ss *ShiftService) UpdateShift(
 	if err != nil {
 		return fmt.Errorf("failed to update shift: %w", err)
 	}
-	if err := validateAdminOrLocationRole(ctx, ss.repo, s.LocationId, []domain.LRole{domain.Manager}); err != nil {
+
+	_, err = requireLocationRole(ctx, domain.Manager, domain.LocationLead)
+	if err != nil {
 		return fmt.Errorf("failed to update shift: %w", err)
 	}
+
+	// Hierarchical check
+	if s.UserId != nil && !ctxkeys.GetIsAdmin(ctx) {
+		bm, err := ss.repo.GetBusinessMember(ctx, *s.UserId, ctxkeys.GetBusinessId(ctx))
+		if err != nil {
+			return fmt.Errorf("failed to update shift: %w", err)
+		}
+		targetRole, err := ss.repo.GetLocationRole(ctx, *s.UserId, s.LocationId, bm.BusinessId)
+		if err != nil {
+			return fmt.Errorf("failed to update shift: %w", err)
+		}
+		if !canActOnRole(ctxkeys.GetRole(ctx), targetRole.Role) {
+			return domain.ErrUnauthorized
+		}
+	}
+
 	// If both times are set, make sure start-time is before end-time
 	if shiftUpdate.StartTime != nil && shiftUpdate.EndTime != nil {
 		if err := domain.ValidateShiftTimes(*shiftUpdate.StartTime, *shiftUpdate.EndTime); err != nil {
@@ -129,6 +154,7 @@ func (ss *ShiftService) UpdateShift(
 			return fmt.Errorf("failed to update shift: %w", domain.ErrInvalidShiftTimes)
 		}
 	}
+
 	if err := ss.repo.UpdateShiftById(ctx, shiftId, shiftUpdate); err != nil {
 		return fmt.Errorf("failed to update shift: %w", err)
 	}
@@ -136,23 +162,37 @@ func (ss *ShiftService) UpdateShift(
 	return nil
 }
 
-// Assign an existing Shift to a targetUserId
-// (Authorization: Admin, Manager)
+// Assign an existing Shift to a target userId
+// (Authorization: Admin, LocationLead, Manager)
 func (ss *ShiftService) AssignShift(
 	ctx context.Context,
 	shiftId,
 	userId string,
 ) error {
-	s, err := getAndValidateShift(ctx, ss.repo, shiftId)
+	_, err := getAndValidateShift(ctx, ss.repo, shiftId)
 	if err != nil {
 		return fmt.Errorf("failed to assign shift: %w", err)
 	}
-	if err := validateAdminOrLocationRole(ctx, ss.repo, s.LocationId, []domain.LRole{domain.Manager}); err != nil {
+	_, err = requireLocationRole(ctx, domain.Manager, domain.LocationLead)
+	if err != nil {
 		return fmt.Errorf("failed to assign shift: %w", err)
 	}
 	// check if userId belongs to businessId
-	if _, err := ss.repo.GetBusinessMember(ctx, userId, ctxkeys.GetBusinessId(ctx)); err != nil {
+	bm, err := ss.repo.GetBusinessMember(ctx, userId, ctxkeys.GetBusinessId(ctx))
+	if err != nil {
 		return fmt.Errorf("failed to assign shift: %w", err)
+	}
+
+	// check is the caller is permitted to assign a shift to the target userId
+	if !ctxkeys.GetIsAdmin(ctx) {
+		locId := ctxkeys.GetLocationId(ctx)
+		targetLocationRole, err := ss.repo.GetLocationRole(ctx, userId, locId, bm.BusinessId)
+		if err != nil {
+			return fmt.Errorf("failed to assign shift: %w", err)
+		}
+		if !canActOnRole(ctxkeys.GetRole(ctx), targetLocationRole.Role) {
+			return domain.ErrUnauthorized
+		}
 	}
 
 	if err := ss.repo.AssignShift(ctx, shiftId, userId); err != nil {
@@ -163,18 +203,41 @@ func (ss *ShiftService) AssignShift(
 }
 
 // Unassign a Shift by its shiftId
-// (Authorization: Admin, Manager)
+// (Authorization: Admin, LocationLead, Manager)
 func (ss *ShiftService) UnassignShift(
 	ctx context.Context,
 	shiftId string,
 ) error {
-	s, err := getAndValidateShift(ctx, ss.repo, shiftId)
+	_, err := getAndValidateShift(ctx, ss.repo, shiftId)
 	if err != nil {
 		return fmt.Errorf("failed to unassign shift: %w", err)
 	}
-	if err := validateAdminOrLocationRole(ctx, ss.repo, s.LocationId, []domain.LRole{domain.Manager}); err != nil {
+	_, err = requireLocationRole(ctx, domain.Manager, domain.LocationLead)
+	if err != nil {
 		return fmt.Errorf("failed to unassign shift: %w", err)
 	}
+
+	// Need the shift's current user to check their role
+	s, _ := ss.repo.GetShiftById(ctx, shiftId)
+	if s.UserId == nil {
+		return domain.ErrNotFound // nothing to unassign
+	}
+
+	bm, err := ss.repo.GetBusinessMember(ctx, *s.UserId, ctxkeys.GetBusinessId(ctx))
+	if err != nil {
+		return fmt.Errorf("failed to unassign shift: %w", err)
+	}
+
+	if !ctxkeys.GetIsAdmin(ctx) {
+		targetRole, err := ss.repo.GetLocationRole(ctx, *s.UserId, s.LocationId, bm.BusinessId)
+		if err != nil {
+			return fmt.Errorf("failed to unassign shift: %w", err)
+		}
+		if !canActOnRole(ctxkeys.GetRole(ctx), targetRole.Role) {
+			return domain.ErrUnauthorized
+		}
+	}
+
 	if err := ss.repo.UnassignShift(ctx, shiftId); err != nil {
 		return fmt.Errorf("failed to unassign shift: %w", err)
 	}
@@ -183,7 +246,7 @@ func (ss *ShiftService) UnassignShift(
 }
 
 // Cancel (or soft-delete) a Shift by its shiftId
-// (Authorization: Admin, Manager)
+// (Authorization: Admin, LocationLead, Manager)
 func (ss *ShiftService) CancelShift(
 	ctx context.Context,
 	shiftId string,
@@ -192,9 +255,27 @@ func (ss *ShiftService) CancelShift(
 	if err != nil {
 		return fmt.Errorf("failed to cancel shift: %w", err)
 	}
-	if err := validateAdminOrLocationRole(ctx, ss.repo, s.LocationId, []domain.LRole{domain.Manager}); err != nil {
+	_, err = requireLocationRole(ctx, domain.Manager, domain.LocationLead)
+	if err != nil {
 		return fmt.Errorf("failed to cancel shift: %w", err)
 	}
+
+	// Hierarchical check
+	if s.UserId != nil && !ctxkeys.GetIsAdmin(ctx) {
+		bm, err := ss.repo.GetBusinessMember(ctx, *s.UserId, ctxkeys.GetBusinessId(ctx))
+		if err != nil {
+			return fmt.Errorf("failed to cancel shift: %w", err)
+		}
+		targetRole, err := ss.repo.GetLocationRole(ctx, *s.UserId, s.LocationId,
+			bm.BusinessId)
+		if err != nil {
+			return fmt.Errorf("failed to cancel shift: %w", err)
+		}
+		if !canActOnRole(ctxkeys.GetRole(ctx), targetRole.Role) {
+			return fmt.Errorf("cannot cancel shift of user with higher or equal role")
+		}
+	}
+
 	if err := ss.repo.CancelShift(ctx, shiftId); err != nil {
 		return fmt.Errorf("failed to cancel shift: %w", err)
 	}
@@ -211,7 +292,7 @@ func (ss *ShiftService) DeleteShift(
 	if _, err := getAndValidateShift(ctx, ss.repo, shiftId); err != nil {
 		return fmt.Errorf("failed to delete shift: %w", err)
 	}
-	if err := validateIsAdmin(ctx); err != nil {
+	if _, err := requireLocationRole(ctx); err != nil { // no roles → admin only
 		return fmt.Errorf("failed to delete shift: %w", err)
 	}
 	if err := ss.repo.DeleteShift(ctx, shiftId); err != nil {

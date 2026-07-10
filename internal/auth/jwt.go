@@ -10,16 +10,17 @@ import (
 
 const accessTokenExpiry = 15 * time.Minute
 
-type Claims struct {
+type AccessTokenClaims struct {
+	Purpose    string       `json:"purpose"` // 'access' ONLY
 	UserId     string       `json:"user_id"`
-	BusinessId string       `json:"business_id"`
+	BusinessId string       `json:"business_id"` // empty for identity-only sessions
 	LocationId string       `json:"location_id"` // empty for admin-only sessions
 	IsAdmin    bool         `json:"is_admin"`
-	Role       domain.LRole `json:"role"` // empty for admin-only sessions
+	Role       domain.LRole `json:"role"` // empty unless a location role applies
 	jwt.RegisteredClaims
 }
 
-func GenerateJWT(
+func GenerateAccessToken(
 	userId,
 	businessId,
 	locationId string,
@@ -27,7 +28,8 @@ func GenerateJWT(
 	role domain.LRole,
 	secret string,
 ) (string, error) {
-	claims := Claims{
+	claims := AccessTokenClaims{
+		Purpose:    "access",
 		UserId:     userId,
 		BusinessId: businessId,
 		IsAdmin:    isAdmin,
@@ -49,10 +51,10 @@ func GenerateJWT(
 	return signed, nil
 }
 
-func ValidateJWT(tokenString, secret string) (*Claims, error) {
+func ValidateAccessToken(tokenString, secret string) (*AccessTokenClaims, error) {
 	token, err := jwt.ParseWithClaims(
 		tokenString,
-		&Claims{},
+		&AccessTokenClaims{},
 		func(token *jwt.Token) (any, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -64,8 +66,8 @@ func ValidateJWT(tokenString, secret string) (*Claims, error) {
 		return nil, fmt.Errorf("failed to parse token: %w", err)
 	}
 
-	claims, ok := token.Claims.(*Claims)
-	if !ok || !token.Valid {
+	claims, ok := token.Claims.(*AccessTokenClaims)
+	if !ok || !token.Valid || claims.Purpose != "access" {
 		return nil, fmt.Errorf("invalid token claims")
 	}
 

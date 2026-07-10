@@ -11,7 +11,7 @@ import (
 	"github.com/dgrco/quikslate/internal/auth"
 )
 
-func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
+func AccessAuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			header := r.Header.Get("Authorization")
@@ -21,7 +21,7 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 			}
 
 			tokenStr := strings.TrimPrefix(header, "Bearer ")
-			claims, err := auth.ValidateJWT(tokenStr, jwtSecret)
+			claims, err := auth.ValidateAccessToken(tokenStr, jwtSecret)
 			if err != nil {
 				response.WriteError(w, domain.ErrUnauthorized.Error(), http.StatusUnauthorized)
 				return

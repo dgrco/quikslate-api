@@ -1,5 +1,5 @@
 -- +goose Up
-CREATE TYPE location_role AS ENUM ('manager', 'employee');
+CREATE TYPE location_role AS ENUM ('location_lead', 'manager', 'employee');
 
 CREATE TABLE location_roles (
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

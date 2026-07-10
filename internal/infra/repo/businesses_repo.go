@@ -46,7 +46,7 @@ func scanBusiness(row pgx.Row) (domain.Business, error) {
 }
 
 func (r *PgRepository) CreateBusiness(ctx context.Context, name string) (domain.Business, error) {
-	b, err := scanBusiness(r.pool.QueryRow(ctx, createBusinessQuery, name))
+	b, err := scanBusiness(r.exec.QueryRow(ctx, createBusinessQuery, name))
 	if err != nil {
 		return domain.Business{}, fmt.Errorf("failed to create business: %w", err)
 	}
@@ -54,7 +54,7 @@ func (r *PgRepository) CreateBusiness(ctx context.Context, name string) (domain.
 }
 
 func (r *PgRepository) GetBusinessById(ctx context.Context, id string) (domain.Business, error) {
-	b, err := scanBusiness(r.pool.QueryRow(ctx, getBusinessByIdQuery, id))
+	b, err := scanBusiness(r.exec.QueryRow(ctx, getBusinessByIdQuery, id))
 	if err != nil {
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
@@ -67,7 +67,7 @@ func (r *PgRepository) GetBusinessById(ctx context.Context, id string) (domain.B
 }
 
 func (r *PgRepository) ChangeBusinessName(ctx context.Context, id, newName string) error {
-	cmdTag, err := r.pool.Exec(ctx, changeBusinessNameQuery, newName, id)
+	cmdTag, err := r.exec.Exec(ctx, changeBusinessNameQuery, newName, id)
 	if err != nil {
 		return fmt.Errorf("failed to change business name: %w", err)
 	}
@@ -78,7 +78,7 @@ func (r *PgRepository) ChangeBusinessName(ctx context.Context, id, newName strin
 }
 
 func (r *PgRepository) DeleteBusiness(ctx context.Context, id string) error {
-	cmdTag, err := r.pool.Exec(ctx, deleteBusinessQuery, id)
+	cmdTag, err := r.exec.Exec(ctx, deleteBusinessQuery, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete business: %w", err)
 	}

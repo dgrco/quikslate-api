@@ -53,10 +53,9 @@ func (ss *ShiftService) CreateShift(
 				return domain.Shift{}, fmt.Errorf("failed to assign shift: %w", err)
 			}
 			if !canActOnRole(ctxkeys.GetRole(ctx), targetLocationRole.Role) {
-				return domain.Shift{}, domain.ErrUnauthorized
+				return domain.Shift{}, domain.ErrForbidden
 			}
 		}
-
 	}
 
 	if err := domain.ValidateShiftTimes(startTime, endTime); err != nil {
@@ -87,11 +86,11 @@ func (ss *ShiftService) GetShift(
 }
 
 // Get all Shifts by locationId
-// (Authorization: All)
+// (Authorization: All - location scoped)
 func (ss *ShiftService) GetShiftsByLocation(
 	ctx context.Context,
 ) ([]domain.Shift, error) {
-	locationId, err := requireLocationRole(ctx, domain.Manager, domain.Employee)
+	locationId, err := requireLocationRole(ctx, domain.Manager, domain.LocationLead, domain.Employee)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get shifts by location: %w", err)
 	}
@@ -133,7 +132,7 @@ func (ss *ShiftService) UpdateShift(
 			return fmt.Errorf("failed to update shift: %w", err)
 		}
 		if !canActOnRole(ctxkeys.GetRole(ctx), targetRole.Role) {
-			return domain.ErrUnauthorized
+			return domain.ErrForbidden
 		}
 	}
 
@@ -191,7 +190,7 @@ func (ss *ShiftService) AssignShift(
 			return fmt.Errorf("failed to assign shift: %w", err)
 		}
 		if !canActOnRole(ctxkeys.GetRole(ctx), targetLocationRole.Role) {
-			return domain.ErrUnauthorized
+			return domain.ErrForbidden
 		}
 	}
 
@@ -208,19 +207,17 @@ func (ss *ShiftService) UnassignShift(
 	ctx context.Context,
 	shiftId string,
 ) error {
-	_, err := getAndValidateShift(ctx, ss.repo, shiftId)
+	s, err := getAndValidateShift(ctx, ss.repo, shiftId)
 	if err != nil {
 		return fmt.Errorf("failed to unassign shift: %w", err)
 	}
+	if s.UserId == nil {
+		return domain.ErrNotFound // nothing to unassign
+	}
+
 	_, err = requireLocationRole(ctx, domain.Manager, domain.LocationLead)
 	if err != nil {
 		return fmt.Errorf("failed to unassign shift: %w", err)
-	}
-
-	// Need the shift's current user to check their role
-	s, _ := ss.repo.GetShiftById(ctx, shiftId)
-	if s.UserId == nil {
-		return domain.ErrNotFound // nothing to unassign
 	}
 
 	bm, err := ss.repo.GetBusinessMember(ctx, *s.UserId, ctxkeys.GetBusinessId(ctx))
@@ -234,7 +231,7 @@ func (ss *ShiftService) UnassignShift(
 			return fmt.Errorf("failed to unassign shift: %w", err)
 		}
 		if !canActOnRole(ctxkeys.GetRole(ctx), targetRole.Role) {
-			return domain.ErrUnauthorized
+			return domain.ErrForbidden
 		}
 	}
 
@@ -272,7 +269,7 @@ func (ss *ShiftService) CancelShift(
 			return fmt.Errorf("failed to cancel shift: %w", err)
 		}
 		if !canActOnRole(ctxkeys.GetRole(ctx), targetRole.Role) {
-			return fmt.Errorf("cannot cancel shift of user with higher or equal role")
+			return domain.ErrForbidden
 		}
 	}
 

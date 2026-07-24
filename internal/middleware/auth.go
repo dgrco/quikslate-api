@@ -29,6 +29,7 @@ func AccessAuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 
 			ctx := context.WithValue(r.Context(), ctxkeys.UserId, claims.UserId)
 			ctx = context.WithValue(ctx, ctxkeys.BusinessId, claims.BusinessId)
+			ctx = context.WithValue(ctx, ctxkeys.IsPrimaryAdmin, claims.IsPrimaryAdmin)
 			ctx = context.WithValue(ctx, ctxkeys.IsAdmin, claims.IsAdmin)
 			ctx = context.WithValue(ctx, ctxkeys.LocationId, claims.LocationId)
 			ctx = context.WithValue(ctx, ctxkeys.Role, claims.Role)

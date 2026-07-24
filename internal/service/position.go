@@ -28,6 +28,10 @@ func (ps *PositionService) CreatePosition(
 		return domain.Position{}, fmt.Errorf("failed to create position: %w", err)
 	}
 
+	if err := domain.ValidatePositionName(positionName); err != nil {
+		return domain.Position{}, fmt.Errorf("failed to create position: %w", err)
+	}
+
 	p, err := ps.repo.CreatePosition(ctx, ctxkeys.GetBusinessId(ctx), positionName)
 	if err != nil {
 		return domain.Position{}, fmt.Errorf("failed to create position: %w", err)
@@ -82,6 +86,10 @@ func (ps *PositionService) RenamePosition(
 
 	_, err := getAndValidatePosition(ctx, ps.repo, positionId)
 	if err != nil {
+		return fmt.Errorf("failed to rename position: %w", err)
+	}
+
+	if err := domain.ValidatePositionName(positionName); err != nil {
 		return fmt.Errorf("failed to rename position: %w", err)
 	}
 

@@ -51,7 +51,7 @@ func (s *InviteService) CreateInvite(
 
 	// Enforce caller -> target role hierarchy
 	if !canActOnRole(ctxkeys.GetRole(ctx), targetRole) {
-		return InviteResult{}, domain.ErrUnauthorized
+		return InviteResult{}, domain.ErrForbidden
 	}
 
 	// Precondition check: user must not already have a pending invite
@@ -173,7 +173,7 @@ func (s *InviteService) AcceptInvite(ctx context.Context, token string) (string,
 
 	// Set-up the user in the business/location
 	// and mark the invite as accepted.
-	if err := txRepo.AddUserToBusiness(ctx, userId, inv.BusinessId, false); err != nil {
+	if err := txRepo.AddUserToBusiness(ctx, userId, inv.BusinessId, false, false); err != nil {
 		return "", err
 	}
 	if err := txRepo.AssignRole(ctx, userId, inv.BusinessId, inv.LocationId, inv.Role); err != nil {

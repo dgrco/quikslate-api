@@ -18,10 +18,19 @@ const (
 		DELETE FROM employee_positions
 		WHERE user_id = $1 AND position_id = $2
 	`
-	getPositionsByUserIdQuery = `
-		SELECT user_id, position_id
-		FROM employee_positions
-		WHERE user_id = $1
+	getPositionsByUserAndBusinessQuery = `
+    SELECT ep.user_id, ep.position_id
+    FROM employee_positions ep
+    JOIN positions p ON p.id = ep.position_id
+    WHERE ep.user_id = $1 AND p.business_id = $2
+	`
+	removeAllPositionsForUserInBusinessQuery = `
+		DELETE FROM employee_positions ep
+		WHERE ep.user_id = $1
+		AND EXISTS (
+			SELECT 1 FROM positions p
+			WHERE p.id = ep.position_id AND business_id = $2
+		)
 	`
 )
 
@@ -73,8 +82,8 @@ func (r *PgRepository) RemovePosition(ctx context.Context, userId, positionId st
 	return nil
 }
 
-func (r *PgRepository) GetPositionsByUserId(ctx context.Context, userId string) ([]domain.EmployeePosition, error) {
-	rows, err := r.exec.Query(ctx, getPositionsByUserIdQuery, userId)
+func (r *PgRepository) GetPositionsByUserAndBusiness(ctx context.Context, userId, businessId string) ([]domain.EmployeePosition, error) {
+	rows, err := r.exec.Query(ctx, getPositionsByUserAndBusinessQuery, userId, businessId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get employee positions by user ID: %w", err)
 	}
@@ -86,6 +95,13 @@ func (r *PgRepository) GetPositionsByUserId(ctx context.Context, userId string) 
 	}
 
 	return employeePositions, nil
+}
+
+func (r *PgRepository) RemoveAllPositionsForUserInBusiness(ctx context.Context, userId, businessId string) error {
+	if _, err := r.exec.Exec(ctx, removeAllPositionsForUserInBusinessQuery, userId, businessId); err != nil {
+		return fmt.Errorf("failed to remove all positions for user in business: %w", err)
+	}
+	return nil
 }
 
 var _ domain.EmployeePositionRepository = (*PgRepository)(nil)

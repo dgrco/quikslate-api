@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"strings"
 	"time"
 )
 
@@ -11,6 +12,13 @@ type Position struct {
 	Name       string    `json:"name"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+func ValidatePositionName(positionName string) error {
+	if strings.TrimSpace(positionName) == "" {
+		return NewValidationError("position name cannot be empty")
+	}
+	return nil
 }
 
 type PositionRepository interface {

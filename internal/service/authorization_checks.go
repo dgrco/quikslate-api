@@ -145,3 +145,18 @@ func canActOnRole(callerRole, targetRole domain.LRole) bool {
 	// Employee can't schedule anyone (shouldn't reach here anyway)
 	return false
 }
+
+// canActOnBusinessMember checks if the caller's admin status permits them to act
+// on the target. This is for business operations only, use canActOnRole for location
+// operations.
+func canActOnBusinessMember(ctx context.Context, target *domain.BusinessMember) bool {
+	if ctxkeys.GetIsPrimaryAdmin(ctx) && !target.IsPrimaryAdmin {
+		// Primary admin cannot act on themselves
+		return true
+	}
+	if ctxkeys.GetIsAdmin(ctx) && !target.IsPrimaryAdmin && !target.IsAdmin {
+		// Admins can't act on other admins, including themselves
+		return true
+	}
+	return false
+}

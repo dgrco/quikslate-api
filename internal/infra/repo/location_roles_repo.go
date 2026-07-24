@@ -29,6 +29,10 @@ const (
 		DELETE FROM location_roles
 		WHERE user_id = $1 AND location_id = $2
 	`
+	deleteLocationRolesOfUserFromBusinessQuery = `
+		DELETE FROM location_roles
+		WHERE user_id = $1 AND business_id = $2
+	`
 )
 
 func scanLocationRoleFields(lr *domain.LocationRole, scan func(...any) error) error {
@@ -110,6 +114,14 @@ func (r *PgRepository) RemoveRole(ctx context.Context, userId, locationId string
 	}
 	if cmdTag.RowsAffected() == 0 {
 		return domain.ErrNotFound
+	}
+	return nil
+}
+
+// This doesn't throw an error is there are no rows since this is a normal case.
+func (r *PgRepository) RemoveAllRolesOfUserFromBusiness(ctx context.Context, userId, businessId string) error {
+	if _, err := r.exec.Exec(ctx, deleteLocationRolesOfUserFromBusinessQuery, userId, businessId); err != nil {
+		return fmt.Errorf("failed to remove all roles of user: %w", err)
 	}
 	return nil
 }

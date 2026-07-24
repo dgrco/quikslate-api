@@ -19,7 +19,7 @@ func NewEmployeeService(repo domain.Repo) *EmployeeService {
 }
 
 // Add a Position to a User.
-// (Authorization: Admin, Manager)
+// (Authorization: Admin, LocationLead, Manager)
 func (es *EmployeeService) AddPosition(
 	ctx context.Context,
 	userId,
@@ -57,7 +57,7 @@ func (es *EmployeeService) AddPosition(
 }
 
 // Remove a Position from a User
-// (Authorization: Admin, Manager)
+// (Authorization: Admin, LocationLead, Manager)
 func (es *EmployeeService) RemovePosition(
 	ctx context.Context,
 	userId,
@@ -77,7 +77,7 @@ func (es *EmployeeService) RemovePosition(
 	if callerLocationId != "" {
 		// verify manager works at the same location as the target
 		if _, err := es.repo.GetLocationRole(ctx, userId, callerLocationId, bm.BusinessId); err != nil {
-			return fmt.Errorf("failed to add position to employee: %w", err)
+			return fmt.Errorf("failed to remove position from employee: %w", err)
 		}
 	}
 	
@@ -94,8 +94,8 @@ func (es *EmployeeService) RemovePosition(
 	return nil
 }
 
-// Get all Positions at a Location for a User
-// (Authorization: Admin, Manager)
+// Get all Positions at a Business for a User
+// (Authorization: Admin, LocationLead, Manager)
 func (es *EmployeeService) GetAllPositionsByUser(
 	ctx context.Context,
 	userId string,
@@ -114,11 +114,11 @@ func (es *EmployeeService) GetAllPositionsByUser(
 	if callerLocationId != "" {
 		// verify manager works at the same location as the target
 		if _, err := es.repo.GetLocationRole(ctx, userId, callerLocationId, bm.BusinessId); err != nil {
-			return nil, fmt.Errorf("failed to add position to employee: %w", err)
+			return nil, fmt.Errorf("failed to get all positions by user: %w", err)
 		}
 	}
 
-	positions, err := es.repo.GetPositionsByUserId(ctx, userId)
+	positions, err := es.repo.GetPositionsByUserAndBusiness(ctx, userId, bm.BusinessId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all positions by user: %w", err)
 	}

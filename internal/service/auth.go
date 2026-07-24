@@ -36,6 +36,9 @@ type AuthResult struct {
 }
 
 func (s *AuthService) Register(ctx context.Context, email, name, password string) (*AuthResult, error) {
+	// Normalize email
+	email = domain.NormalizeEmail(email)
+
 	// validate email and password
 	if err := domain.ValidateUserRegistrationCredentials(email, password); err != nil {
 		return nil, err
@@ -54,10 +57,13 @@ func (s *AuthService) Register(ctx context.Context, email, name, password string
 	}
 
 	// generate identity-only tokens (no business or location ids)
-	return s.generateTokens(ctx, s.repo, user.Id, "", "", false, domain.EmptyRole)
+	return s.generateTokens(ctx, s.repo, user.Id, "", "", false, false, domain.EmptyRole)
 }
 
 func (s *AuthService) Login(ctx context.Context, email, password string) (*AuthResult, error) {
+	// Normalize email
+	email = domain.NormalizeEmail(email)
+
 	user, err := s.repo.GetUserByEmail(ctx, email)
 	if errors.Is(err, domain.ErrNotFound) {
 		return nil, domain.ErrInvalidCredentials
@@ -86,7 +92,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*AuthR
 
 	if len(businesses) == 0 {
 		// Identity token
-		return s.generateTokens(ctx, s.repo, user.Id, "", "", false, domain.EmptyRole)
+		return s.generateTokens(ctx, s.repo, user.Id, "", "", false, false, domain.EmptyRole)
 	}
 
 	if len(businesses) == 1 {
@@ -155,7 +161,7 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthRe
 		return nil, fmt.Errorf("failed to rotate refresh token: %w", err)
 	}
 
-	result, err := s.generateTokens(ctx, txRepo, bm.UserId, bm.BusinessId, locationId, bm.IsAdmin, role)
+	result, err := s.generateTokens(ctx, txRepo, bm.UserId, bm.BusinessId, locationId, bm.IsPrimaryAdmin, bm.IsAdmin, role)
 	if err != nil {
 		return nil, err
 	}
@@ -186,9 +192,9 @@ func (s *AuthService) SelectBusiness(ctx context.Context, businessId string) (*A
 	}
 
 	if bm.IsAdmin && len(lrs) == 0 {
-		return s.generateTokens(ctx, s.repo, userId, businessId, domain.EmptyLocation, bm.IsAdmin, domain.EmptyRole)
+		return s.generateTokens(ctx, s.repo, userId, businessId, domain.EmptyLocation, bm.IsPrimaryAdmin, bm.IsAdmin, domain.EmptyRole)
 	} else if len(lrs) == 1 {
-		return s.generateTokens(ctx, s.repo, userId, businessId, lrs[0].LocationId, bm.IsAdmin, lrs[0].Role)
+		return s.generateTokens(ctx, s.repo, userId, businessId, lrs[0].LocationId, bm.IsPrimaryAdmin, bm.IsAdmin, lrs[0].Role)
 	} else {
 		// Many locations -> requires selection
 		accessToken, err := s.generateInterimAccessToken(userId)
@@ -225,13 +231,22 @@ func (s *AuthService) SelectLocation(ctx context.Context, businessId, locationId
 		}
 		role = lr.Role
 	}
-	return s.generateTokens(ctx, s.repo, bm.UserId, bm.BusinessId, locationId, bm.IsAdmin, role)
+	return s.generateTokens(ctx, s.repo, bm.UserId, bm.BusinessId, locationId, bm.IsPrimaryAdmin, bm.IsAdmin, role)
 }
 
 // generateTokens creates a JWT and a refresh token for a given user
-func (s *AuthService) generateTokens(ctx context.Context, repo domain.Repo, userId, businessId, locationId string, isAdmin bool, role domain.LRole) (*AuthResult, error) {
+func (s *AuthService) generateTokens(
+	ctx context.Context,
+	repo domain.Repo,
+	userId,
+	businessId,
+	locationId string,
+	isPrimaryAdmin,
+	isAdmin bool,
+	role domain.LRole,
+) (*AuthResult, error) {
 	// generate JWT
-	accessToken, err := auth.GenerateAccessToken(userId, businessId, locationId, isAdmin, role, s.jwtSecret)
+	accessToken, err := auth.GenerateAccessToken(userId, businessId, locationId, isPrimaryAdmin, isAdmin, role, s.jwtSecret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
@@ -260,13 +275,13 @@ func (s *AuthService) generateTokens(ctx context.Context, repo domain.Repo, user
 }
 
 func (s *AuthService) generateInterimAccessToken(userId string) (string, error) {
-	return auth.GenerateAccessToken(userId, "", "", false, domain.EmptyRole, s.jwtSecret)
+	return auth.GenerateAccessToken(userId, "", "", false, false, domain.EmptyRole, s.jwtSecret)
 }
 
 // generateSecureToken generates n random bytes and hex encodes each,
 // resulting in a string of length 2n.
 func generateSecureToken(n int) (string, error) {
-	bytes := make([]byte, 32)
+	bytes := make([]byte, n)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", err
 	}

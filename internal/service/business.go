@@ -41,6 +41,10 @@ func (bs *BusinessService) RenameBusiness(ctx context.Context, businessName stri
 	if err := validateIsAdmin(ctx); err != nil {
 		return fmt.Errorf("failed to rename business: %w", err)
 	}
+	if err := domain.ValidateBusinessName(businessName); err != nil {
+		return fmt.Errorf("failed to rename business: %w", err)
+	}
+
 	businessId := ctxkeys.GetBusinessId(ctx)
 
 	if err := bs.repo.ChangeBusinessName(ctx, businessId, businessName); err != nil {
@@ -62,4 +66,105 @@ func (bs *BusinessService) DeleteBusiness(ctx context.Context) error {
 		return fmt.Errorf("failed to delete business: %w", err)
 	}
 	return nil
+}
+
+// Remove a User from a Business.
+// Implicit parameters set by http context: {businessId}
+// (Authorization: admin)
+func (s *BusinessService) RemoveUserFromBusiness(ctx context.Context, userId string) error {
+	if err := validateIsAdmin(ctx); err != nil {
+		return fmt.Errorf("failed to remove user from business: %w", err)
+	}
+
+	tx, err := s.repo.BeginTransaction(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	txRepo := s.repo.WithTx(tx)
+
+	businessId := ctxkeys.GetBusinessId(ctx)
+
+	bm, err := txRepo.GetBusinessMember(ctx, userId, businessId)
+	if err != nil {
+		return fmt.Errorf("failed to remove user from business: %w", err)
+	}
+
+	// Check if the caller can remove the target
+	if !canActOnBusinessMember(ctx, &bm) {
+		return domain.ErrForbidden
+	}
+
+	// Last admin removal check
+	if bm.IsAdmin {
+		nAdmins, err := txRepo.GetAdminCount(ctx, businessId)
+		if err != nil {
+			return fmt.Errorf("failed to remove user from business: %w", err)
+		}
+		if nAdmins <= 1 {
+			return domain.ErrLastAdminRemoval
+		}
+	}
+
+	// Remove the user from business_members
+	if err := txRepo.RemoveUserFromBusiness(ctx, userId, businessId); err != nil {
+		return fmt.Errorf("failed to remove user from business: %w", err)
+	}
+
+	// Remove every location role the user has at the business
+	if err := txRepo.RemoveAllRolesOfUserFromBusiness(ctx, userId, businessId); err != nil {
+		return fmt.Errorf("failed to remove user from business: %w", err)
+	}
+
+	// Remove all employee_positions entries associated with the user and the business
+	if err := txRepo.RemoveAllPositionsForUserInBusiness(ctx, userId, businessId); err != nil {
+		return fmt.Errorf("failed to remove user from business: %w", err)
+	}
+
+	return tx.Commit(ctx)
+}
+
+// Sets the admin status of a User.
+// Implicit parameters from context: {businessId}
+// (Authorization: admin)
+func (s *BusinessService) SetAdminForBusinessMember(ctx context.Context, userId string, admin bool) error {
+	if err := validateIsAdmin(ctx); err != nil {
+		return fmt.Errorf("failed to remove user from business: %w", err)
+	}
+
+	tx, err := s.repo.BeginTransaction(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	txRepo := s.repo.WithTx(tx)
+
+	businessId := ctxkeys.GetBusinessId(ctx)
+
+	bm, err := txRepo.GetBusinessMember(ctx, userId, businessId)
+	if err != nil {
+		return fmt.Errorf("failed to set admin: %w", err)
+	}
+
+	// Check if the caller can modify the target
+	if !canActOnBusinessMember(ctx, &bm) {
+		return domain.ErrForbidden
+	}
+
+	// Last admin removal check
+	if bm.IsAdmin && admin == false {
+		nAdmins, err := txRepo.GetAdminCount(ctx, businessId)
+		if err != nil {
+			return fmt.Errorf("failed to set admin: %w", err)
+		}
+		if nAdmins <= 1 {
+			return domain.ErrLastAdminRemoval
+		}
+	}
+
+	if err := txRepo.SetAdminForBusinessMember(ctx, userId, businessId, admin); err != nil {
+		return fmt.Errorf("failed to set admin: %w", err)
+	}
+
+	return tx.Commit(ctx)
 }

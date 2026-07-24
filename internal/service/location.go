@@ -84,6 +84,11 @@ func (ls *LocationService) UpdateLocation(
 	if err := validateIsAdmin(ctx); err != nil {
 		return fmt.Errorf("failed to update location: %w", err)
 	}
+	if update.Name != nil {
+		if err := domain.ValidateLocationName(*update.Name); err != nil {
+			return fmt.Errorf("failed to update location: %w", err)
+		}
+	}
 
 	_, err := getAndValidateLocation(ctx, ls.repo, locationId)
 	if err != nil {

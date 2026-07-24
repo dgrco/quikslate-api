@@ -9,11 +9,12 @@ import (
 type contextKey string
 
 const (
-	UserId     contextKey = "userId"
-	BusinessId contextKey = "businessId"
-	LocationId contextKey = "locationId"
-	IsAdmin    contextKey = "isAdmin"
-	Role       contextKey = "role"
+	UserId         contextKey = "userId"
+	BusinessId     contextKey = "businessId"
+	LocationId     contextKey = "locationId"
+	IsPrimaryAdmin contextKey = "isPrimaryAdmin"
+	IsAdmin        contextKey = "isAdmin"
+	Role           contextKey = "role"
 )
 
 func GetUserId(ctx context.Context) string {
@@ -33,6 +34,11 @@ func GetLocationId(ctx context.Context) string {
 
 func GetIsAdmin(ctx context.Context) bool {
 	v, _ := ctx.Value(IsAdmin).(bool)
+	return v
+}
+
+func GetIsPrimaryAdmin(ctx context.Context) bool {
+	v, _ := ctx.Value(IsPrimaryAdmin).(bool)
 	return v
 }
 

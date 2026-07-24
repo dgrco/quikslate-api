@@ -47,4 +47,5 @@ type LocationRoleRepository interface {
 	GetLocationRole(ctx context.Context, userId, locationId, businessId string) (LocationRole, error)
 	GetLocationRolesByUserAndBusiness(ctx context.Context, userId, businessId string) ([]LocationRole, error)
 	RemoveRole(ctx context.Context, userId, locationId string) error
+	RemoveAllRolesOfUserFromBusiness(ctx context.Context, userId, businessId string) error
 }

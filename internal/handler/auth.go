@@ -90,17 +90,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	authResult, err := h.authService.Register(r.Context(), req.Email, req.Name, req.Password)
 	if err != nil {
-		var validationErr *domain.ValidationError
-		switch {
-		case errors.As(err, &validationErr):
-			response.WriteError(w, validationErr.Message, http.StatusBadRequest)
-		case errors.Is(err, domain.ErrAlreadyExists):
-			response.WriteError(w, "that email is already in use", http.StatusConflict)
-		default:
-			// unexpected errors
-			log.Printf("register: %v", err)
-			response.WriteError(w, ERR_INTERNAL_SERVER, http.StatusInternalServerError)
-		}
+		handleServiceError(w, err, "register")
 		return
 	}
 	setRefreshTokenCookie(w, authResult.RefreshToken, h.secure)
@@ -124,13 +114,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	authResult, err := h.authService.Login(r.Context(), req.Email, req.Password)
 	if err != nil {
-		switch {
-		case errors.Is(err, domain.ErrInvalidCredentials):
-			response.WriteError(w, "invalid login credentials", http.StatusUnauthorized)
-		default:
-			log.Printf("login: %v", err)
-			response.WriteError(w, ERR_INTERNAL_SERVER, http.StatusInternalServerError)
-		}
+		handleServiceError(w, err, "login")
 		return
 	}
 
@@ -161,13 +145,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 
 	authResult, err := h.authService.Refresh(r.Context(), refreshToken)
 	if err != nil {
-		switch {
-		case errors.Is(err, domain.ErrInvalidRefreshToken):
-			response.WriteError(w, ERR_INVALID_REFRESH_TOKEN, http.StatusUnauthorized)
-		default:
-			log.Printf("refresh: %v", err)
-			response.WriteError(w, ERR_INTERNAL_SERVER, http.StatusInternalServerError)
-		}
+		handleServiceError(w, err, "refresh")
 		return
 	}
 
@@ -227,13 +205,7 @@ func (h *AuthHandler) SelectBusiness(w http.ResponseWriter, r *http.Request) {
 
 	authResult, err := h.authService.SelectBusiness(r.Context(), req.BusinessId)
 	if err != nil {
-		switch {
-		case errors.Is(err, domain.ErrNotFound):
-			response.WriteError(w, ERR_NOT_FOUND, http.StatusNotFound)
-		default:
-			log.Printf("select business: %v", err)
-			response.WriteError(w, ERR_INTERNAL_SERVER, http.StatusInternalServerError)
-		}
+		handleServiceError(w, err, "select business")
 		return
 	}
 
@@ -277,13 +249,7 @@ func (h *AuthHandler) SelectLocation(w http.ResponseWriter, r *http.Request) {
 
 	authResult, err := h.authService.SelectLocation(r.Context(), req.BusinessId, req.LocationId)
 	if err != nil {
-		switch {
-		case errors.Is(err, domain.ErrNotFound):
-			response.WriteError(w, ERR_NOT_FOUND, http.StatusNotFound)
-		default:
-			log.Printf("select location: %v", err)
-			response.WriteError(w, ERR_INTERNAL_SERVER, http.StatusInternalServerError)
-		}
+		handleServiceError(w, err, "select location")
 		return
 	}
 

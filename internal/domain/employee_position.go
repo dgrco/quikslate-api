@@ -10,5 +10,6 @@ type EmployeePosition struct {
 type EmployeePositionRepository interface { 
 	AddPosition(ctx context.Context, userId, positionId string) error
 	RemovePosition(ctx context.Context, userId, positionId string) error
-	GetPositionsByUserId(ctx context.Context, userId string) ([]EmployeePosition, error)
+	GetPositionsByUserAndBusiness(ctx context.Context, userId, businessId string) ([]EmployeePosition, error)
+	RemoveAllPositionsForUserInBusiness(ctx context.Context, userId, businessId string) error
 }

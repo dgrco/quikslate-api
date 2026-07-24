@@ -11,12 +11,13 @@ import (
 const accessTokenExpiry = 15 * time.Minute
 
 type AccessTokenClaims struct {
-	Purpose    string       `json:"purpose"` // 'access' ONLY
-	UserId     string       `json:"user_id"`
-	BusinessId string       `json:"business_id"` // empty for identity-only sessions
-	LocationId string       `json:"location_id"` // empty for admin-only sessions
-	IsAdmin    bool         `json:"is_admin"`
-	Role       domain.LRole `json:"role"` // empty unless a location role applies
+	Purpose        string       `json:"purpose"` // 'access' ONLY
+	UserId         string       `json:"user_id"`
+	BusinessId     string       `json:"business_id"` // empty for identity-only sessions
+	LocationId     string       `json:"location_id"` // empty for admin-only sessions
+	IsPrimaryAdmin bool         `json:"is_primary_admin"`
+	IsAdmin        bool         `json:"is_admin"`
+	Role           domain.LRole `json:"role"` // empty unless a location role applies
 	jwt.RegisteredClaims
 }
 
@@ -24,17 +25,19 @@ func GenerateAccessToken(
 	userId,
 	businessId,
 	locationId string,
+	isPrimaryAdmin,
 	isAdmin bool,
 	role domain.LRole,
 	secret string,
 ) (string, error) {
 	claims := AccessTokenClaims{
-		Purpose:    "access",
-		UserId:     userId,
-		BusinessId: businessId,
-		IsAdmin:    isAdmin,
-		LocationId: locationId,
-		Role:       role,
+		Purpose:        "access",
+		UserId:         userId,
+		BusinessId:     businessId,
+		IsPrimaryAdmin: isPrimaryAdmin,
+		IsAdmin:        isAdmin,
+		LocationId:     locationId,
+		Role:           role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(accessTokenExpiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

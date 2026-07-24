@@ -124,11 +124,26 @@ func (h *LocationHandler) UpdateLocation(w http.ResponseWriter, r *http.Request)
 	response.WriteJSON(w, SimpleResponse{"location updated"}, http.StatusOK)
 }
 
+// DeleteLocation uses context to fetch the BusinessId.
+// The locationId is retrieved via the params.
+func (h *LocationHandler) DeleteLocation(w http.ResponseWriter, r *http.Request) {
+	locationId := chi.URLParam(r, "id")
+ 
+	if err := h.locationService.DeleteLocation(r.Context(), locationId); err != nil {
+		handleServiceError(w, err, "delete location")
+		return
+	}
+ 
+	response.WriteJSON(w, SimpleResponse{Message: "location deleted"}, http.StatusOK)
+}
+
 func (h *LocationHandler) SetupRoutes(r chi.Router) {
 	r.Route("/locations", func(r chi.Router) {
 		r.Use(middleware.AccessAuthMiddleware(h.jwtSecret))
+		r.Post("/", h.CreateLocation)
 		r.Get("/", h.GetAllLocations)
 		r.Get("/{id}", h.GetLocation)
 		r.Patch("/{id}", h.UpdateLocation)
+		r.Delete("/{id}", h.DeleteLocation)
 	})
 }

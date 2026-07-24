@@ -18,6 +18,39 @@ func NewBusinessService(repo domain.Repo) *BusinessService {
 	}
 }
 
+// Create a Business.
+// Anyone authenticated can make a business.
+func (bs *BusinessService) CreateBusiness(ctx context.Context, name string) (string, error) {
+	if err := domain.ValidateBusinessName(name); err != nil {
+		return "", fmt.Errorf("failed to create business: %w", err)
+	}
+
+	userId := ctxkeys.GetUserId(ctx)
+
+	tx, err := bs.repo.BeginTransaction(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to create business: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	txRepo := bs.repo.WithTx(tx)
+
+	b, err := txRepo.CreateBusiness(ctx, name)
+	if err != nil {
+		return "", fmt.Errorf("failed to create business: %w", err)
+	}
+
+	if err := txRepo.AddUserToBusiness(ctx, userId, b.Id, true, true); err != nil {
+		return "", fmt.Errorf("failed to create business: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return "", fmt.Errorf("failed to create business: %w", err)
+	}
+
+	return b.Id, nil
+}
+
 // Get a Business.
 // Implicit parameters set by http context: {businessId}
 // (Authorization: admin)

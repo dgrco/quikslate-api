@@ -35,13 +35,22 @@ func main() {
 
 	// Other service/handlers
 	businessService := service.NewBusinessService(pgRepo)
-	businessHandler := handler.NewBusinessHandler(businessService, cfg.JWTSecret)
+	businessHandler := handler.NewBusinessHandler(businessService, authService, cfg.JWTSecret)
 
 	locationService := service.NewLocationService(pgRepo)
 	locationHandler := handler.NewLocationHandler(locationService, cfg.JWTSecret)
 
 	inviteService := service.NewInviteService(pgRepo)
 	inviteHandler := handler.NewInviteHandler(inviteService, authService, cfg.JWTSecret)
+
+	positionService := service.NewPositionService(pgRepo)
+	positionHandler := handler.NewPositionHandler(positionService, cfg.JWTSecret)
+
+	shiftService := service.NewShiftService(pgRepo)
+	shiftHandler := handler.NewShiftHandler(shiftService, cfg.JWTSecret)
+
+	employeeService := service.NewEmployeeService(pgRepo)
+	employeeHandler := handler.NewEmployeeHandler(employeeService, cfg.JWTSecret)
 
 	// Setup router
 	r := chi.NewRouter()
@@ -57,6 +66,9 @@ func main() {
 	businessHandler.SetupRoutes(r)
 	locationHandler.SetupRoutes(r)
 	inviteHandler.SetupRoutes(r)
+	positionHandler.SetupRoutes(r)
+	shiftHandler.SetupRoutes(r)
+	employeeHandler.SetupRoutes(r)
 
 	// Listen
 	log.Printf("Server started on port %s", cfg.ApiPort)

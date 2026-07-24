@@ -69,7 +69,7 @@ func (h *InviteHandler) CreateInvite(w http.ResponseWriter, r *http.Request) {
 // GetInviteByToken fetches the raw token from params
 func (h *InviteHandler) GetInviteByToken(w http.ResponseWriter, r *http.Request) {
 	inviteToken := chi.URLParam(r, "token")
-	inv, err := h.inviteService.GetInviteByToken(r.Context(), inviteToken)
+	inv, err := h.inviteService.PreviewInviteByToken(r.Context(), inviteToken)
 	if err != nil {
 		handleServiceError(w, err, "get invite by token")
 		return

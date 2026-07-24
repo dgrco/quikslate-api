@@ -102,9 +102,8 @@ func (s *InviteService) CreateInvite(
 	return InviteResult{InviteToken: token}, nil
 }
 
-// GetInviteByToken requires the user first be authenticated to preview.
-// Therefore, if a user doesn't yet have an account, they will need to make one.
-func (s *InviteService) GetInviteByToken(ctx context.Context, token string) (InviteDTO, error) {
+// PreviewInviteByToken is callable by anyone with the token.
+func (s *InviteService) PreviewInviteByToken(ctx context.Context, token string) (InviteDTO, error) {
 	tokenHash := hashToken(token)
 
 	inv, err := s.repo.GetInviteByTokenHash(ctx, tokenHash)
@@ -116,14 +115,6 @@ func (s *InviteService) GetInviteByToken(ctx context.Context, token string) (Inv
 		return InviteDTO{}, domain.ErrNotFound
 	}
 
-	u, err := s.repo.GetUserById(ctx, ctxkeys.GetUserId(ctx))
-	if err != nil {
-		return InviteDTO{}, fmt.Errorf("failed to get invite by token: %w", err)
-	}
-	if u.Email != inv.Email {
-		return InviteDTO{}, domain.ErrForbidden
-	}
-
 	// Get business to extract businessName
 	b, err := s.repo.GetBusinessById(ctx, inv.BusinessId)
 	if err != nil {
@@ -131,7 +122,7 @@ func (s *InviteService) GetInviteByToken(ctx context.Context, token string) (Inv
 	}
 
 	dto := InviteDTO{
-		Email: u.Email,
+		Email: inv.Email,
 		BusinessName: b.Name,
 		Role: inv.Role,
 		ExpiresAt: inv.ExpiresAt,

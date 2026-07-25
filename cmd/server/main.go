@@ -9,7 +9,6 @@ import (
 	"github.com/dgrco/quikslate/internal/database"
 	"github.com/dgrco/quikslate/internal/handler"
 	"github.com/dgrco/quikslate/internal/infra/repo"
-	middleware "github.com/dgrco/quikslate/internal/middleware"
 	"github.com/dgrco/quikslate/internal/service"
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
@@ -26,13 +25,32 @@ func main() {
 	}
 	defer pool.Close()
 
-	log.Println("Database connected successfully")
+	log.Println("Database connected")
 
 	pgRepo := repo.NewPgRepository(pool)
 
 	// Auth service/handler
 	authService := service.NewAuthService(pgRepo, cfg.JWTSecret)
-	authHandler := handler.NewAuthHandler(authService, cfg.IsSecureMode())
+	authHandler := handler.NewAuthHandler(authService, cfg.IsSecureMode(), cfg.JWTSecret)
+
+	// Other service/handlers
+	businessService := service.NewBusinessService(pgRepo)
+	businessHandler := handler.NewBusinessHandler(businessService, authService, cfg.JWTSecret)
+
+	locationService := service.NewLocationService(pgRepo)
+	locationHandler := handler.NewLocationHandler(locationService, cfg.JWTSecret)
+
+	inviteService := service.NewInviteService(pgRepo)
+	inviteHandler := handler.NewInviteHandler(inviteService, authService, cfg.JWTSecret)
+
+	positionService := service.NewPositionService(pgRepo)
+	positionHandler := handler.NewPositionHandler(positionService, cfg.JWTSecret)
+
+	shiftService := service.NewShiftService(pgRepo)
+	shiftHandler := handler.NewShiftHandler(shiftService, cfg.JWTSecret)
+
+	employeeService := service.NewEmployeeService(pgRepo)
+	employeeHandler := handler.NewEmployeeHandler(employeeService, cfg.JWTSecret)
 
 	// Setup router
 	r := chi.NewRouter()
@@ -40,14 +58,17 @@ func main() {
 	r.Use(chiMiddleware.Recoverer)
 
 	// Route Setup
-	authHandler.SetupRoutes(r)
-
-	r.Route("/protected", func(r chi.Router) {
-		r.Use(middleware.AuthMiddleware(cfg.JWTSecret))
-		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("Hello world"))
-		})
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("Hi from Quikslate :)"))
 	})
+
+	authHandler.SetupRoutes(r)
+	businessHandler.SetupRoutes(r)
+	locationHandler.SetupRoutes(r)
+	inviteHandler.SetupRoutes(r)
+	positionHandler.SetupRoutes(r)
+	shiftHandler.SetupRoutes(r)
+	employeeHandler.SetupRoutes(r)
 
 	// Listen
 	log.Printf("Server started on port %s", cfg.ApiPort)

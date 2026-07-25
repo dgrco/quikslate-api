@@ -2,14 +2,23 @@ package domain
 
 import (
 	"context"
+	"strings"
 	"time"
 )
 
 type Business struct {
-	ID        string    `json:"id"`
+	Id        string    `json:"id"`
 	Name      string    `json:"name"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// ValidateBusinessName returns an error if the businessName is empty
+func ValidateBusinessName(businessName string) error {
+	if strings.TrimSpace(businessName) == "" {
+		return NewValidationError("business name cannot be empty")
+	}
+	return nil
 }
 
 type BusinessRepository interface {

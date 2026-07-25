@@ -7,7 +7,11 @@ var (
 	ErrNotFound            = errors.New("not found")
 	ErrAlreadyExists       = errors.New("already exists")
 	ErrInvalidCredentials  = errors.New("invalid credentials")
-	ErrInvalidRefreshToken = errors.New("invalid refresh token") // non-existent or expired
+	ErrInvalidRefreshToken = errors.New("invalid refresh token") // if non-existent or expired
+	ErrUnauthorized        = errors.New("unauthorized")
+	ErrForbidden 					 = errors.New("forbidden")
+	ErrInvalidShiftTimes	 = errors.New("invalid shift times")
+	ErrLastAdminRemoval		 = errors.New("cannot remove last admin")
 )
 
 // Validation Errors

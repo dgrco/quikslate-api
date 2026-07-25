@@ -9,43 +9,52 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func (r *PgRepository) CreateBusiness(ctx context.Context, name string) (domain.Business, error) {
-	query := `
+const (
+	createBusinessQuery = `
 		INSERT INTO businesses (name)
 		VALUES ($1)
 		RETURNING id, name, created_at, updated_at
 	`
-
-	var b domain.Business
-	err := r.pool.QueryRow(ctx, query, name).Scan(
-		&b.ID,
-		&b.Name,
-		&b.CreatedAt,
-		&b.UpdatedAt,
-	)
-
-	if err != nil {
-		return domain.Business{}, fmt.Errorf("failed to create business: %w", err)
-	}
-
-	return b, nil
-}
-
-func (r *PgRepository) GetBusinessById(ctx context.Context, id string) (domain.Business, error) {
-	query := `
+	getBusinessByIdQuery = `
 		SELECT id, name, created_at, updated_at
 		FROM businesses
 		WHERE id = $1
 	`
+	changeBusinessNameQuery = `
+		UPDATE businesses
+		SET name = $1, updated_at = NOW()
+		WHERE id = $2
+	`
+	deleteBusinessQuery = `
+		DELETE FROM businesses
+		WHERE id = $1
+	`
+)
 
+func scanBusiness(row pgx.Row) (domain.Business, error) {
 	var b domain.Business
-	err := r.pool.QueryRow(ctx, query, id).Scan(
-		&b.ID,
+	err := row.Scan(
+		&b.Id,
 		&b.Name,
 		&b.CreatedAt,
 		&b.UpdatedAt,
 	)
+	if err != nil {
+		return domain.Business{}, err
+	}
+	return b, nil
+}
 
+func (r *PgRepository) CreateBusiness(ctx context.Context, name string) (domain.Business, error) {
+	b, err := scanBusiness(r.exec.QueryRow(ctx, createBusinessQuery, name))
+	if err != nil {
+		return domain.Business{}, fmt.Errorf("failed to create business: %w", err)
+	}
+	return b, nil
+}
+
+func (r *PgRepository) GetBusinessById(ctx context.Context, id string) (domain.Business, error) {
+	b, err := scanBusiness(r.exec.QueryRow(ctx, getBusinessByIdQuery, id))
 	if err != nil {
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
@@ -54,39 +63,28 @@ func (r *PgRepository) GetBusinessById(ctx context.Context, id string) (domain.B
 			return domain.Business{}, fmt.Errorf("failed to get business by ID: %w", err)
 		}
 	}
-
 	return b, nil
 }
 
 func (r *PgRepository) ChangeBusinessName(ctx context.Context, id, newName string) error {
-	query := `
-		UPDATE businesses
-		SET name = $1, updated_at = NOW()
-		WHERE id = $2
-	`
-
-	cmdTag, err := r.pool.Exec(ctx, query, newName, id)
+	cmdTag, err := r.exec.Exec(ctx, changeBusinessNameQuery, newName, id)
 	if err != nil {
 		return fmt.Errorf("failed to change business name: %w", err)
 	}
 	if cmdTag.RowsAffected() == 0 {
 		return domain.ErrNotFound
 	}
-
 	return nil
 }
 
 func (r *PgRepository) DeleteBusiness(ctx context.Context, id string) error {
-	query := `
-		DELETE FROM businesses
-		WHERE id = $1
-	`
-
-	_, err := r.pool.Exec(ctx, query, id)
+	cmdTag, err := r.exec.Exec(ctx, deleteBusinessQuery, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete business: %w", err)
 	}
-
+	if cmdTag.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
 	return nil
 }
 

@@ -7,80 +7,60 @@ import (
 
 	"github.com/dgrco/quikslate/internal/domain"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
-func (r *PgRepository) CreatePosition(ctx context.Context, businessID, name string) (domain.Position, error) {
-	query := `
+const (
+	createPositionQuery = `
 		INSERT INTO positions (business_id, name)
 		VALUES ($1, $2)
 		RETURNING id, business_id, name, created_at, updated_at
 	`
-
-	var p domain.Position
-	err := r.pool.QueryRow(ctx, query, businessID, name).Scan(
-		&p.ID,
-		&p.BusinessID,
-		&p.Name,
-		&p.CreatedAt,
-		&p.UpdatedAt,
-	)
-	if err != nil {
-		return domain.Position{}, fmt.Errorf("failed to create position: %w", err)
-	}
-
-	return p, nil
-}
-
-func (r *PgRepository) GetPositionByID(ctx context.Context, id string) (domain.Position, error) {
-	query := `
+	getPositionByIdQuery = `
 		SELECT id, business_id, name, created_at, updated_at
 		FROM positions
 		WHERE id = $1
 	`
-
-	var p domain.Position
-	err := r.pool.QueryRow(ctx, query, id).Scan(
-		&p.ID,
-		&p.BusinessID,
-		&p.Name,
-		&p.CreatedAt,
-		&p.UpdatedAt,
-	)
-	if err != nil {
-		switch {
-		case errors.Is(err, pgx.ErrNoRows):
-			return domain.Position{}, domain.ErrNotFound
-		default:
-			return domain.Position{}, fmt.Errorf("failed to get position by ID: %w", err)
-		}
-	}
-
-	return p, nil
-}
-
-func (r *PgRepository) GetPositionsByBusinessID(ctx context.Context, businessID string) ([]domain.Position, error) {
-	query := `
+	getPositionsByBusinessIdQuery = `
 		SELECT id, business_id, name, created_at, updated_at
 		FROM positions
 		WHERE business_id = $1
 	`
+	changePositionNameQuery = `
+		UPDATE positions
+		SET name = $1, updated_at = NOW()
+		WHERE id = $2
+	`
+	deletePositionQuery = `
+		DELETE FROM positions
+		WHERE id = $1
+	`
+)
 
-	rows, err := r.pool.Query(ctx, query, businessID)
+func scanPositionFields(p *domain.Position, scan func(...any) error) error {
+	return scan(
+		&p.Id,
+		&p.BusinessId,
+		&p.Name,
+		&p.CreatedAt,
+		&p.UpdatedAt,
+	)
+}
+
+func scanPosition(row pgx.Row) (domain.Position, error) {
+	var p domain.Position
+	err := scanPositionFields(&p, row.Scan)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get positions by business ID: %w", err)
+		return domain.Position{}, err
 	}
-	defer rows.Close()
+	return p, nil
+}
 
-	var positions []domain.Position
+func scanPositions(rows pgx.Rows) ([]domain.Position, error) {
+	positions := []domain.Position{}
 	for rows.Next() {
 		var p domain.Position
-		err := rows.Scan(
-			&p.ID,
-			&p.BusinessID,
-			&p.Name,
-			&p.CreatedAt,
-			&p.UpdatedAt,
-		)
+		err := scanPositionFields(&p, rows.Scan)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan position: %w", err)
 		}
@@ -89,19 +69,53 @@ func (r *PgRepository) GetPositionsByBusinessID(ctx context.Context, businessID 
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("failed to iterate positions: %w", err)
 	}
+	return positions, nil
+}
 
+func (r *PgRepository) CreatePosition(ctx context.Context, businessId, name string) (domain.Position, error) {
+	p, err := scanPosition(r.exec.QueryRow(ctx, createPositionQuery, businessId, name))
+	if err != nil {
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == ErrPgUniqueConstraintViolation {
+			return domain.Position{}, domain.ErrAlreadyExists
+		}
+		return domain.Position{}, fmt.Errorf("failed to create position: %w", err)
+	}
+	return p, nil
+}
+
+func (r *PgRepository) GetPositionById(ctx context.Context, id string) (domain.Position, error) {
+	p, err := scanPosition(r.exec.QueryRow(ctx, getPositionByIdQuery, id))
+	if err != nil {
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return domain.Position{}, domain.ErrNotFound
+		default:
+			return domain.Position{}, fmt.Errorf("failed to get position by ID: %w", err)
+		}
+	}
+	return p, nil
+}
+
+func (r *PgRepository) GetPositionsByBusinessId(ctx context.Context, businessId string) ([]domain.Position, error) {
+	rows, err := r.exec.Query(ctx, getPositionsByBusinessIdQuery, businessId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get positions by business ID: %w", err)
+	}
+	defer rows.Close()
+
+	positions, err := scanPositions(rows)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get positions by business ID: %w", err)
+	}
 	return positions, nil
 }
 
 func (r *PgRepository) ChangePositionName(ctx context.Context, id, name string) error {
-	query := `
-		UPDATE positions
-		SET name = $1, updated_at = NOW()
-		WHERE id = $2
-	`
-
-	cmdTag, err := r.pool.Exec(ctx, query, name, id)
+	cmdTag, err := r.exec.Exec(ctx, changePositionNameQuery, name, id)
 	if err != nil {
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == ErrPgUniqueConstraintViolation {
+			return domain.ErrAlreadyExists
+		}
 		return fmt.Errorf("failed to change position name: %w", err)
 	}
 	if cmdTag.RowsAffected() == 0 {
@@ -111,12 +125,7 @@ func (r *PgRepository) ChangePositionName(ctx context.Context, id, name string) 
 }
 
 func (r *PgRepository) DeletePosition(ctx context.Context, id string) error {
-	query := `
-		DELETE FROM positions
-		WHERE id = $1
-	`
-
-	cmdTag, err := r.pool.Exec(ctx, query, id)
+	cmdTag, err := r.exec.Exec(ctx, deletePositionQuery, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete position: %w", err)
 	}

@@ -131,8 +131,7 @@ func (s *InviteService) PreviewInviteByToken(ctx context.Context, token string) 
 	return dto, nil
 }
 
-// AcceptInvite accepts an invite if validated and returns the associated businessId,
-// which is so the handler can call AuthService.SelectBusiness.
+// AcceptInvite accepts an invite if validated and returns the associated businessId.
 func (s *InviteService) AcceptInvite(ctx context.Context, token string) (string, error) {
 	userId := ctxkeys.GetUserId(ctx)
 

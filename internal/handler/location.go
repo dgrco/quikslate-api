@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/dgrco/quikslate/internal/domain"
-	"github.com/dgrco/quikslate/internal/middleware"
 	"github.com/dgrco/quikslate/internal/response"
 	"github.com/dgrco/quikslate/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -13,12 +12,18 @@ import (
 
 type LocationHandler struct {
 	locationService *service.LocationService
+	authService     *service.AuthService
 	jwtSecret       string
 }
 
-func NewLocationHandler(locationService *service.LocationService, jwtSecret string) *LocationHandler {
+func NewLocationHandler(
+	locationService *service.LocationService,
+	authService *service.AuthService,
+	jwtSecret string,
+) *LocationHandler {
 	return &LocationHandler{
 		locationService,
+		authService,
 		jwtSecret,
 	}
 }
@@ -70,7 +75,7 @@ func (h *LocationHandler) CreateLocation(w http.ResponseWriter, r *http.Request)
 // GetLocation uses context to fetch the BusinessId.
 // The locationId is retrieved via the params.
 func (h *LocationHandler) GetLocation(w http.ResponseWriter, r *http.Request) {
-	locationId := chi.URLParam(r, "id")
+	locationId := chi.URLParam(r, "locationId")
 
 	l, err := h.locationService.GetLocation(r.Context(), locationId)
 	if err != nil {
@@ -99,7 +104,7 @@ func (h *LocationHandler) GetAllLocations(w http.ResponseWriter, r *http.Request
 // - address
 // This is a partial update operation.
 func (h *LocationHandler) UpdateLocation(w http.ResponseWriter, r *http.Request) {
-	locationId := chi.URLParam(r, "id")
+	locationId := chi.URLParam(r, "locationId")
 
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
@@ -127,23 +132,30 @@ func (h *LocationHandler) UpdateLocation(w http.ResponseWriter, r *http.Request)
 // DeleteLocation uses context to fetch the BusinessId.
 // The locationId is retrieved via the params.
 func (h *LocationHandler) DeleteLocation(w http.ResponseWriter, r *http.Request) {
-	locationId := chi.URLParam(r, "id")
- 
+	locationId := chi.URLParam(r, "locationId")
+
 	if err := h.locationService.DeleteLocation(r.Context(), locationId); err != nil {
 		handleServiceError(w, err, "delete location")
 		return
 	}
- 
+
 	response.WriteJSON(w, SimpleResponse{Message: "location deleted"}, http.StatusOK)
 }
 
 func (h *LocationHandler) SetupRoutes(r chi.Router) {
-	r.Route("/locations", func(r chi.Router) {
-		r.Use(middleware.AccessAuthMiddleware(h.jwtSecret))
-		r.Post("/", h.CreateLocation)
-		r.Get("/", h.GetAllLocations)
-		r.Get("/{id}", h.GetLocation)
-		r.Patch("/{id}", h.UpdateLocation)
-		r.Delete("/{id}", h.DeleteLocation)
+	r.Route("/businesses/{businessId}/locations", func(r chi.Router) {
+		// Identity Only
+		r.Group(func(r chi.Router) {
+			r.Use(RequireBusinessMember(h.authService, h.jwtSecret))
+			r.Get("/", h.GetAllLocations)
+			r.Post("/", h.CreateLocation)
+		})
+		// Location (thus Business!) scoped
+		r.Route("/{locationId}", func(r chi.Router) {
+			r.Use(RequireLocationMember(h.authService, h.jwtSecret))
+			r.Get("/", h.GetLocation)
+			r.Patch("/", h.UpdateLocation)
+			r.Delete("/", h.DeleteLocation)
+		})
 	})
 }

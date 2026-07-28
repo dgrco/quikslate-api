@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/dgrco/quikslate/internal/domain"
-	"github.com/dgrco/quikslate/internal/middleware"
 	"github.com/dgrco/quikslate/internal/response"
 	"github.com/dgrco/quikslate/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -13,12 +12,18 @@ import (
 
 type PositionHandler struct {
 	positionService *service.PositionService
+	authService *service.AuthService
 	jwtSecret       string
 }
 
-func NewPositionHandler(positionService *service.PositionService, jwtSecret string) *PositionHandler {
+func NewPositionHandler(
+	positionService *service.PositionService,
+	authService *service.AuthService,
+	jwtSecret string,
+) *PositionHandler {
 	return &PositionHandler{
 		positionService,
+		authService,
 		jwtSecret,
 	}
 }
@@ -68,7 +73,7 @@ func (h *PositionHandler) CreatePosition(w http.ResponseWriter, r *http.Request)
 // GetPosition uses context to fetch the BusinessId.
 // The positionId is retrieved via the params.
 func (h *PositionHandler) GetPosition(w http.ResponseWriter, r *http.Request) {
-	positionId := chi.URLParam(r, "id")
+	positionId := chi.URLParam(r, "positionId")
 
 	p, err := h.positionService.GetPosition(r.Context(), positionId)
 	if err != nil {
@@ -94,7 +99,7 @@ func (h *PositionHandler) GetAllPositionsByBusiness(w http.ResponseWriter, r *ht
 // RenamePosition uses context to fetch the BusinessId.
 // The new position name is retrieved via the request body.
 func (h *PositionHandler) RenamePosition(w http.ResponseWriter, r *http.Request) {
-	positionId := chi.URLParam(r, "id")
+	positionId := chi.URLParam(r, "positionId")
 
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
@@ -115,7 +120,7 @@ func (h *PositionHandler) RenamePosition(w http.ResponseWriter, r *http.Request)
 // DeletePosition uses context to fetch the BusinessId.
 // The positionId is retrieved via the params.
 func (h *PositionHandler) DeletePosition(w http.ResponseWriter, r *http.Request) {
-	positionId := chi.URLParam(r, "id")
+	positionId := chi.URLParam(r, "positionId")
 
 	if err := h.positionService.DeletePosition(r.Context(), positionId); err != nil {
 		handleServiceError(w, err, "delete position")
@@ -126,12 +131,14 @@ func (h *PositionHandler) DeletePosition(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *PositionHandler) SetupRoutes(r chi.Router) {
-	r.Route("/positions", func(r chi.Router) {
-		r.Use(middleware.AccessAuthMiddleware(h.jwtSecret))
+	r.Route("/businesses/{businessId}/positions", func(r chi.Router) {
+		r.Use(RequireBusinessMember(h.authService, h.jwtSecret))
+		r.Route("/{positionId}", func(r chi.Router) {
+			r.Get("/", h.GetPosition)
+			r.Patch("/", h.RenamePosition)
+			r.Delete("/", h.DeletePosition)
+		})
 		r.Post("/", h.CreatePosition)
 		r.Get("/", h.GetAllPositionsByBusiness)
-		r.Get("/{id}", h.GetPosition)
-		r.Patch("/{id}", h.RenamePosition)
-		r.Delete("/{id}", h.DeletePosition)
 	})
 }

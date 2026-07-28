@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/dgrco/quikslate/internal/domain"
-	"github.com/dgrco/quikslate/internal/middleware"
 	"github.com/dgrco/quikslate/internal/response"
 	"github.com/dgrco/quikslate/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -13,12 +12,18 @@ import (
 
 type EmployeeHandler struct {
 	employeeService *service.EmployeeService
+	authService     *service.AuthService
 	jwtSecret       string
 }
 
-func NewEmployeeHandler(employeeService *service.EmployeeService, jwtSecret string) *EmployeeHandler {
+func NewEmployeeHandler(
+	employeeService *service.EmployeeService,
+	authService *service.AuthService,
+	jwtSecret string,
+) *EmployeeHandler {
 	return &EmployeeHandler{
 		employeeService,
+		authService,
 		jwtSecret,
 	}
 }
@@ -87,10 +92,12 @@ func (h *EmployeeHandler) GetAllPositionsByUser(w http.ResponseWriter, r *http.R
 }
 
 func (h *EmployeeHandler) SetupRoutes(r chi.Router) {
-	r.Route("/employees/{userId}/positions", func(r chi.Router) {
-		r.Use(middleware.AccessAuthMiddleware(h.jwtSecret))
-		r.Post("/", h.AddPosition)
-		r.Get("/", h.GetAllPositionsByUser)
-		r.Delete("/{positionId}", h.RemovePosition)
+	r.Route("/businesses/{businessId}/employees", func(r chi.Router) {
+		r.Use(RequireBusinessMember(h.authService, h.jwtSecret))
+		r.Route("/{userId}/positions", func(r chi.Router) {
+			r.Post("/", h.AddPosition)
+			r.Get("/", h.GetAllPositionsByUser)
+			r.Delete("/{positionId}", h.RemovePosition)
+		})
 	})
 }

@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/dgrco/quikslate/internal/domain"
-	"github.com/dgrco/quikslate/internal/middleware"
 	"github.com/dgrco/quikslate/internal/response"
 	"github.com/dgrco/quikslate/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -41,6 +40,10 @@ type createInviteRequest struct {
 
 type CreateInviteResponse struct {
 	InviteToken string `json:"invite_token"`
+}
+
+type AcceptInviteResponse struct {
+	BusinessId string `json:"business_id"`
 }
 
 // Handlers
@@ -87,21 +90,18 @@ func (h *InviteHandler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authResult, err := h.authService.SelectBusiness(r.Context(), businessId)
-	if err != nil {
-		handleServiceError(w, err, "accept invite")
-		return
-	}
-
-	response.WriteJSON(w, authResult, http.StatusOK)
+	response.WriteJSON(w, AcceptInviteResponse{BusinessId: businessId}, http.StatusOK)
 }
 
 // Routes
 func (h *InviteHandler) SetupRoutes(r chi.Router) {
-	r.Route("/invites", func(r chi.Router) {
+	r.Route("/businesses/{businessId}/invites", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.AccessAuthMiddleware(h.jwtSecret))
+			r.Use(RequireBusinessMember(h.authService, h.jwtSecret))
 			r.Post("/", h.CreateInvite)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(RequireIdentity(h.authService, h.jwtSecret))
 			r.Post("/{token}/accept", h.AcceptInvite)
 		})
 		r.Get("/{token}", h.GetInviteByToken)

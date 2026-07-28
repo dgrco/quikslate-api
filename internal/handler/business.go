@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dgrco/quikslate/internal/middleware"
 	"github.com/dgrco/quikslate/internal/response"
 	"github.com/dgrco/quikslate/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -45,6 +44,10 @@ type setAdminRequest struct {
 
 // Response Structures
 
+type CreateBusinessResponse struct {
+	BusinessId string `json:"business_id"`
+}
+
 type BusinessDTO struct {
 	Id        string
 	Name      string
@@ -70,16 +73,10 @@ func (h *BusinessHandler) CreateBusiness(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	authResult, err := h.authService.SelectBusiness(r.Context(), businessId)
-	if err != nil {
-		handleServiceError(w, err, "create business")
-		return
-	}
-
-	response.WriteJSON(w, authResult, http.StatusOK)
+	response.WriteJSON(w, CreateBusinessResponse{BusinessId: businessId}, http.StatusOK)
 }
 
-// GetBusiness uses context to fetch the Business.
+// GetBusiness uses URLParams to fetch the Business.
 // Therefore, there is NO request body needed.
 func (h *BusinessHandler) GetBusiness(w http.ResponseWriter, r *http.Request) {
 	b, err := h.businessService.GetBusiness(r.Context())
@@ -163,9 +160,14 @@ func (h *BusinessHandler) SetAdminForBusinessMember(w http.ResponseWriter, r *ht
 
 func (h *BusinessHandler) SetupRoutes(r chi.Router) {
 	r.Route("/businesses", func(r chi.Router) {
+		// Identity-only
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.AccessAuthMiddleware(h.jwtSecret))
+			r.Use(RequireIdentity(h.authService, h.jwtSecret))
 			r.Post("/", h.CreateBusiness)
+		})
+		// Business-scoped
+		r.Route("/{businessId}", func(r chi.Router) {
+			r.Use(RequireBusinessMember(h.authService, h.jwtSecret))
 			r.Get("/", h.GetBusiness)
 			r.Patch("/", h.RenameBusiness)
 			r.Delete("/", h.DeleteBusiness)

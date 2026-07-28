@@ -8,6 +8,7 @@ type Tx interface {
 }
 
 type Repo interface {
+	// Dedicated (Sub-)Repos
 	UserRepository
 	RefreshTokenRepository
 	BusinessRepository
@@ -18,6 +19,9 @@ type Repo interface {
 	BusinessMemberRepository
 	EmployeePositionRepository
 	InviteRepository
+	AuthzContextRepository
+
+	// Transaction Functions
 	BeginTransaction(ctx context.Context) (Tx, error)
 	WithTx(tx Tx) Repo
 }

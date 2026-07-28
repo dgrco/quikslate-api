@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/dgrco/quikslate/internal/domain"
-	"github.com/dgrco/quikslate/internal/middleware"
 	"github.com/dgrco/quikslate/internal/response"
 	"github.com/dgrco/quikslate/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -45,24 +44,10 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
-type selectBusinessRequest struct {
-	BusinessId string `json:"business_id"`
-}
-
-type selectLocationRequest struct {
-	BusinessId string `json:"business_id"`
-	LocationId string `json:"location_id"`
-}
-
 // Response Structures
 
 type TokenResponse struct {
 	AccessToken string `json:"access_token"`
-}
-
-type LocationSelectionResponse struct {
-	BusinessId string   `json:"business_id"`
-	Locations  []string `json:"locations"`
 }
 
 // Helpers
@@ -118,17 +103,6 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if authResult.RequiresBusinessSelection {
-		// return businesses list + UserId, do NOT set cookie
-		response.WriteJSON(w, authResult, http.StatusOK)
-		return
-	}
-	if authResult.RequiresLocationSelection {
-		// return locations list, do NOT set cookie
-		response.WriteJSON(w, authResult, http.StatusOK)
-		return
-	}
-	// set cookie if fully authenticated
 	setRefreshTokenCookie(w, authResult.RefreshToken, h.secure)
 	response.WriteJSON(w, TokenResponse{AccessToken: authResult.AccessToken}, http.StatusOK)
 }
@@ -188,75 +162,6 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, SimpleResponse{Message: "ok"}, http.StatusOK)
 }
 
-func (h *AuthHandler) SelectBusiness(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
-
-	var req selectBusinessRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.WriteError(w, ERR_INVALID_REQ_BODY, http.StatusBadRequest)
-		return
-	}
-
-	// validate request
-	if isEmpty(req.BusinessId) {
-		response.WriteError(w, "business_id is required", http.StatusBadRequest)
-		return
-	}
-
-	authResult, err := h.authService.SelectBusiness(r.Context(), req.BusinessId)
-	if err != nil {
-		handleServiceError(w, err, "select business")
-		return
-	}
-
-	if !authResult.RequiresLocationSelection {
-		// no need to select a location
-		setRefreshTokenCookie(w, authResult.RefreshToken, h.secure)
-		response.WriteJSON(w, TokenResponse{AccessToken: authResult.AccessToken}, http.StatusOK)
-		return
-	}
-
-	// return a location selection response
-	locationList := []string{}
-	for _, lr := range authResult.Locations {
-		locationList = append(locationList, lr.LocationId)
-	}
-
-	response.WriteJSON(
-		w,
-		LocationSelectionResponse{
-			BusinessId: req.BusinessId,
-			Locations:  locationList,
-		},
-		http.StatusOK,
-	)
-}
-
-func (h *AuthHandler) SelectLocation(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
-
-	var req selectLocationRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.WriteError(w, ERR_INVALID_REQ_BODY, http.StatusBadRequest)
-		return
-	}
-
-	// validate request
-	if isEmpty(req.BusinessId) || isEmpty(req.LocationId) {
-		response.WriteError(w, "business_id and location_id are required", http.StatusBadRequest)
-		return
-	}
-
-	authResult, err := h.authService.SelectLocation(r.Context(), req.BusinessId, req.LocationId)
-	if err != nil {
-		handleServiceError(w, err, "select location")
-		return
-	}
-
-	setRefreshTokenCookie(w, authResult.RefreshToken, h.secure)
-	response.WriteJSON(w, TokenResponse{AccessToken: authResult.AccessToken}, http.StatusOK)
-}
-
 func setRefreshTokenCookie(w http.ResponseWriter, token string, secure bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
@@ -281,11 +186,5 @@ func (h *AuthHandler) SetupRoutes(r chi.Router) {
 
 		r.Post("/refresh", h.Refresh)
 		r.Post("/logout", h.Logout)
-
-		r.Group(func(r chi.Router) {
-			r.Use(middleware.AccessAuthMiddleware(h.jwtSecret))
-			r.Post("/select-business", h.SelectBusiness)
-			r.Post("/select-location", h.SelectLocation)
-		})
 	})
 }

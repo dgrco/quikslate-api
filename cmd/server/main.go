@@ -38,19 +38,19 @@ func main() {
 	businessHandler := handler.NewBusinessHandler(businessService, authService, cfg.JWTSecret)
 
 	locationService := service.NewLocationService(pgRepo)
-	locationHandler := handler.NewLocationHandler(locationService, cfg.JWTSecret)
+	locationHandler := handler.NewLocationHandler(locationService, authService, cfg.JWTSecret)
 
 	inviteService := service.NewInviteService(pgRepo)
 	inviteHandler := handler.NewInviteHandler(inviteService, authService, cfg.JWTSecret)
 
 	positionService := service.NewPositionService(pgRepo)
-	positionHandler := handler.NewPositionHandler(positionService, cfg.JWTSecret)
+	positionHandler := handler.NewPositionHandler(positionService, authService, cfg.JWTSecret)
 
 	shiftService := service.NewShiftService(pgRepo)
-	shiftHandler := handler.NewShiftHandler(shiftService, cfg.JWTSecret)
+	shiftHandler := handler.NewShiftHandler(shiftService, authService, cfg.JWTSecret)
 
 	employeeService := service.NewEmployeeService(pgRepo)
-	employeeHandler := handler.NewEmployeeHandler(employeeService, cfg.JWTSecret)
+	employeeHandler := handler.NewEmployeeHandler(employeeService, authService, cfg.JWTSecret)
 
 	// Setup router
 	r := chi.NewRouter()

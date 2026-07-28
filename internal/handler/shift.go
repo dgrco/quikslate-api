@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/dgrco/quikslate/internal/domain"
-	"github.com/dgrco/quikslate/internal/middleware"
 	"github.com/dgrco/quikslate/internal/response"
 	"github.com/dgrco/quikslate/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -14,12 +13,18 @@ import (
 
 type ShiftHandler struct {
 	shiftService *service.ShiftService
+	authService *service.AuthService
 	jwtSecret    string
 }
 
-func NewShiftHandler(shiftService *service.ShiftService, jwtSecret string) *ShiftHandler {
+func NewShiftHandler(
+	shiftService *service.ShiftService,
+	authService *service.AuthService,
+	jwtSecret string,
+) *ShiftHandler {
 	return &ShiftHandler{
 		shiftService,
+		authService,
 		jwtSecret,
 	}
 }
@@ -86,7 +91,7 @@ func (h *ShiftHandler) CreateShift(w http.ResponseWriter, r *http.Request) {
 
 // GetShift retrieves the shiftId via the params.
 func (h *ShiftHandler) GetShift(w http.ResponseWriter, r *http.Request) {
-	shiftId := chi.URLParam(r, "id")
+	shiftId := chi.URLParam(r, "shiftId")
 
 	s, err := h.shiftService.GetShift(r.Context(), shiftId)
 	if err != nil {
@@ -113,7 +118,7 @@ func (h *ShiftHandler) GetShiftsByLocation(w http.ResponseWriter, r *http.Reques
 // This retrieves optional values from the request body: status, start_time,
 // end_time. This is a partial update operation.
 func (h *ShiftHandler) UpdateShift(w http.ResponseWriter, r *http.Request) {
-	shiftId := chi.URLParam(r, "id")
+	shiftId := chi.URLParam(r, "shiftId")
 
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
@@ -138,7 +143,7 @@ func (h *ShiftHandler) UpdateShift(w http.ResponseWriter, r *http.Request) {
 // AssignShift retrieves the shiftId via the params, and the target userId via
 // the request body.
 func (h *ShiftHandler) AssignShift(w http.ResponseWriter, r *http.Request) {
-	shiftId := chi.URLParam(r, "id")
+	shiftId := chi.URLParam(r, "shiftId")
 
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
@@ -159,7 +164,7 @@ func (h *ShiftHandler) AssignShift(w http.ResponseWriter, r *http.Request) {
 // UnassignShift retrieves the shiftId via the params.
 // Therefore: no need to wrap the request body in MaxBytesReader.
 func (h *ShiftHandler) UnassignShift(w http.ResponseWriter, r *http.Request) {
-	shiftId := chi.URLParam(r, "id")
+	shiftId := chi.URLParam(r, "shiftId")
 
 	if err := h.shiftService.UnassignShift(r.Context(), shiftId); err != nil {
 		handleServiceError(w, err, "unassign shift")
@@ -172,7 +177,7 @@ func (h *ShiftHandler) UnassignShift(w http.ResponseWriter, r *http.Request) {
 // CancelShift retrieves the shiftId via the params.
 // Therefore: no need to wrap the request body in MaxBytesReader.
 func (h *ShiftHandler) CancelShift(w http.ResponseWriter, r *http.Request) {
-	shiftId := chi.URLParam(r, "id")
+	shiftId := chi.URLParam(r, "shiftId")
 
 	if err := h.shiftService.CancelShift(r.Context(), shiftId); err != nil {
 		handleServiceError(w, err, "cancel shift")
@@ -185,7 +190,7 @@ func (h *ShiftHandler) CancelShift(w http.ResponseWriter, r *http.Request) {
 // DeleteShift retrieves the shiftId via the params.
 // Therefore: no need to wrap the request body in MaxBytesReader.
 func (h *ShiftHandler) DeleteShift(w http.ResponseWriter, r *http.Request) {
-	shiftId := chi.URLParam(r, "id")
+	shiftId := chi.URLParam(r, "shiftId")
 
 	if err := h.shiftService.DeleteShift(r.Context(), shiftId); err != nil {
 		handleServiceError(w, err, "delete shift")
@@ -196,15 +201,17 @@ func (h *ShiftHandler) DeleteShift(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ShiftHandler) SetupRoutes(r chi.Router) {
-	r.Route("/shifts", func(r chi.Router) {
-		r.Use(middleware.AccessAuthMiddleware(h.jwtSecret))
+	r.Route("/businesses/{businessId}/locations/{locationId}/shifts", func(r chi.Router) {
+		r.Use(RequireLocationMember(h.authService, h.jwtSecret))
+		r.Route("/{shiftId}", func(r chi.Router) {
+			r.Get("/", h.GetShift)
+			r.Patch("/", h.UpdateShift)
+			r.Patch("/assign", h.AssignShift)
+			r.Patch("/unassign", h.UnassignShift)
+			r.Patch("/cancel", h.CancelShift)
+			r.Delete("/", h.DeleteShift)
+		})
 		r.Post("/", h.CreateShift)
 		r.Get("/", h.GetShiftsByLocation)
-		r.Get("/{id}", h.GetShift)
-		r.Patch("/{id}", h.UpdateShift)
-		r.Patch("/{id}/assign", h.AssignShift)
-		r.Patch("/{id}/unassign", h.UnassignShift)
-		r.Patch("/{id}/cancel", h.CancelShift)
-		r.Delete("/{id}", h.DeleteShift)
 	})
 }

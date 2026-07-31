@@ -8,14 +8,13 @@ import (
 )
 
 type User struct {
-	Id               string     `json:"id"`
-	Email            string     `json:"email"`
-	Name						 string			`json:"name"`
-	Password         string     `json:"password"` // Hashed Password
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
+	Id        string    `json:"id"`
+	Email     string    `json:"email"`
+	Name      string    `json:"name"`
+	Password  string    `json:"password"` // Hashed Password
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
-
 
 // ValidateEmail checks if an email is structured properly
 func ValidateEmail(email string) error {

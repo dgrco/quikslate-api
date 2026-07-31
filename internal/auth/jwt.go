@@ -4,40 +4,19 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgrco/quikslate/internal/domain"
 	"github.com/golang-jwt/jwt/v5"
 )
 
 const accessTokenExpiry = 15 * time.Minute
 
 type AccessTokenClaims struct {
-	Purpose        string       `json:"purpose"` // 'access' ONLY
-	UserId         string       `json:"user_id"`
-	BusinessId     string       `json:"business_id"` // empty for identity-only sessions
-	LocationId     string       `json:"location_id"` // empty for admin-only sessions
-	IsPrimaryAdmin bool         `json:"is_primary_admin"`
-	IsAdmin        bool         `json:"is_admin"`
-	Role           domain.LRole `json:"role"` // empty unless a location role applies
+	UserId string `json:"user_id"`
 	jwt.RegisteredClaims
 }
 
-func GenerateAccessToken(
-	userId,
-	businessId,
-	locationId string,
-	isPrimaryAdmin,
-	isAdmin bool,
-	role domain.LRole,
-	secret string,
-) (string, error) {
+func GenerateAccessToken(userId, secret string) (string, error) {
 	claims := AccessTokenClaims{
-		Purpose:        "access",
-		UserId:         userId,
-		BusinessId:     businessId,
-		IsPrimaryAdmin: isPrimaryAdmin,
-		IsAdmin:        isAdmin,
-		LocationId:     locationId,
-		Role:           role,
+		UserId: userId,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(accessTokenExpiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -70,7 +49,7 @@ func ValidateAccessToken(tokenString, secret string) (*AccessTokenClaims, error)
 	}
 
 	claims, ok := token.Claims.(*AccessTokenClaims)
-	if !ok || !token.Valid || claims.Purpose != "access" {
+	if !ok || !token.Valid {
 		return nil, fmt.Errorf("invalid token claims")
 	}
 

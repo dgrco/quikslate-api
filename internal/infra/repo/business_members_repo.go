@@ -21,11 +21,6 @@ const (
 		FROM business_members
 		WHERE user_id = $1 AND business_id = $2
 	`
-	getBusinessMembersByUserIdQuery = `
-		SELECT user_id, business_id, is_primary_admin, is_admin, created_at, updated_at
-		FROM business_members
-		WHERE user_id = $1
-	`
 	setAdminForBusinessMemberQuery = `
 		UPDATE business_members
 		SET is_admin = $3, updated_at = NOW()
@@ -63,21 +58,6 @@ func scanBusinessMember(row pgx.Row) (domain.BusinessMember, error) {
 	return bm, nil
 }
 
-func scanBusinessMembers(rows pgx.Rows) ([]domain.BusinessMember, error) {
-	businessMembers := []domain.BusinessMember{}
-	for rows.Next() {
-		var bm domain.BusinessMember
-		if err := scanBusinessMemberFields(&bm, rows.Scan); err != nil {
-			return nil, fmt.Errorf("failed to scan business member: %w", err)
-		}
-		businessMembers = append(businessMembers, bm)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to iterate business members: %w", err)
-	}
-	return businessMembers, nil
-}
-
 func (r *PgRepository) AddUserToBusiness(
 	ctx context.Context,
 	userId,
@@ -106,21 +86,6 @@ func (r *PgRepository) GetBusinessMember(ctx context.Context, userId, businessId
 		}
 	}
 	return bm, nil
-}
-
-func (r *PgRepository) GetBusinessMembersByUserId(ctx context.Context, userId string) ([]domain.BusinessMember, error) {
-	rows, err := r.exec.Query(ctx, getBusinessMembersByUserIdQuery, userId)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get business members by user ID: %w", err)
-	}
-	defer rows.Close()
-
-	businessMembers, err := scanBusinessMembers(rows)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get business members by user ID: %w", err)
-	}
-
-	return businessMembers, nil
 }
 
 func (r *PgRepository) SetAdminForBusinessMember(ctx context.Context, userId, businessId string, admin bool) error {

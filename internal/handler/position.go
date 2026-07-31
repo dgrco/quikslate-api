@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/dgrco/quikslate/internal/domain"
-	"github.com/dgrco/quikslate/internal/middleware"
 	"github.com/dgrco/quikslate/internal/response"
 	"github.com/dgrco/quikslate/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -13,12 +12,18 @@ import (
 
 type PositionHandler struct {
 	positionService *service.PositionService
+	authService     *service.AuthService
 	jwtSecret       string
 }
 
-func NewPositionHandler(positionService *service.PositionService, jwtSecret string) *PositionHandler {
+func NewPositionHandler(
+	positionService *service.PositionService,
+	authService *service.AuthService,
+	jwtSecret string,
+) *PositionHandler {
 	return &PositionHandler{
 		positionService,
+		authService,
 		jwtSecret,
 	}
 }
@@ -45,8 +50,21 @@ type MultiplePositionResponse struct {
 
 // Handlers
 
-// CreatePosition uses context to fetch the BusinessId.
-// The position name is retrieved via the request body.
+// CreatePosition creates a new position under the business identified by businessId.
+//
+//	@Summary		Create position
+//	@Description	Create a new position (job role, business-wide) under a business. Admin only.
+//	@Tags			positions
+//	@Security		BearerAuth
+//	@Accept			json
+//	@Produce		json
+//	@Param			businessId	path		string					true	"Business ID"
+//	@Param			body		body		createPositionRequest	true	"Position details"
+//	@Success		200			{object}	SinglePositionResponse
+//	@Failure		400			{object}	response.errorResponse
+//	@Failure		401			{object}	response.errorResponse
+//	@Failure		403			{object}	response.errorResponse
+//	@Router			/businesses/{businessId}/positions [post]
 func (h *PositionHandler) CreatePosition(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
@@ -65,10 +83,22 @@ func (h *PositionHandler) CreatePosition(w http.ResponseWriter, r *http.Request)
 	response.WriteJSON(w, SinglePositionResponse{Position: p}, http.StatusOK)
 }
 
-// GetPosition uses context to fetch the BusinessId.
-// The positionId is retrieved via the params.
+// GetPosition returns the position identified by positionId.
+//
+//	@Summary		Get position
+//	@Description	Get a single position by ID. Business member only.
+//	@Tags			positions
+//	@Security		BearerAuth
+//	@Produce		json
+//	@Param			businessId	path		string	true	"Business ID"
+//	@Param			positionId	path		string	true	"Position ID"
+//	@Success		200			{object}	SinglePositionResponse
+//	@Failure		401			{object}	response.errorResponse
+//	@Failure		403			{object}	response.errorResponse
+//	@Failure		404			{object}	response.errorResponse
+//	@Router			/businesses/{businessId}/positions/{positionId} [get]
 func (h *PositionHandler) GetPosition(w http.ResponseWriter, r *http.Request) {
-	positionId := chi.URLParam(r, "id")
+	positionId := chi.URLParam(r, "positionId")
 
 	p, err := h.positionService.GetPosition(r.Context(), positionId)
 	if err != nil {
@@ -79,8 +109,18 @@ func (h *PositionHandler) GetPosition(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, SinglePositionResponse{Position: p}, http.StatusOK)
 }
 
-// GetAllPositionsByBusiness uses context to fetch the BusinessId.
-// Therefore: no need to wrap the request body in MaxBytesReader.
+// GetAllPositionsByBusiness returns every position belonging to the business identified by businessId.
+//
+//	@Summary		List positions
+//	@Description	List all positions for a business. Business member only.
+//	@Tags			positions
+//	@Security		BearerAuth
+//	@Produce		json
+//	@Param			businessId	path		string	true	"Business ID"
+//	@Success		200			{object}	MultiplePositionResponse
+//	@Failure		401			{object}	response.errorResponse
+//	@Failure		403			{object}	response.errorResponse
+//	@Router			/businesses/{businessId}/positions [get]
 func (h *PositionHandler) GetAllPositionsByBusiness(w http.ResponseWriter, r *http.Request) {
 	ps, err := h.positionService.GetAllPositionsByBusiness(r.Context())
 	if err != nil {
@@ -91,10 +131,24 @@ func (h *PositionHandler) GetAllPositionsByBusiness(w http.ResponseWriter, r *ht
 	response.WriteJSON(w, MultiplePositionResponse{Positions: ps}, http.StatusOK)
 }
 
-// RenamePosition uses context to fetch the BusinessId.
-// The new position name is retrieved via the request body.
+// RenamePosition updates the position's name.
+//
+//	@Summary		Rename position
+//	@Description	Rename a position. Admin only.
+//	@Tags			positions
+//	@Security		BearerAuth
+//	@Accept			json
+//	@Produce		json
+//	@Param			businessId	path		string					true	"Business ID"
+//	@Param			positionId	path		string					true	"Position ID"
+//	@Param			body		body		renamePositionRequest	true	"New name"
+//	@Success		200			{object}	SimpleResponse
+//	@Failure		400			{object}	response.errorResponse
+//	@Failure		401			{object}	response.errorResponse
+//	@Failure		403			{object}	response.errorResponse
+//	@Router			/businesses/{businessId}/positions/{positionId} [patch]
 func (h *PositionHandler) RenamePosition(w http.ResponseWriter, r *http.Request) {
-	positionId := chi.URLParam(r, "id")
+	positionId := chi.URLParam(r, "positionId")
 
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
@@ -112,10 +166,21 @@ func (h *PositionHandler) RenamePosition(w http.ResponseWriter, r *http.Request)
 	response.WriteJSON(w, SimpleResponse{Message: "position renamed"}, http.StatusOK)
 }
 
-// DeletePosition uses context to fetch the BusinessId.
-// The positionId is retrieved via the params.
+// DeletePosition deletes the position identified by positionId.
+//
+//	@Summary		Delete position
+//	@Description	Delete a position. Admin only.
+//	@Tags			positions
+//	@Security		BearerAuth
+//	@Produce		json
+//	@Param			businessId	path		string	true	"Business ID"
+//	@Param			positionId	path		string	true	"Position ID"
+//	@Success		200			{object}	SimpleResponse
+//	@Failure		401			{object}	response.errorResponse
+//	@Failure		403			{object}	response.errorResponse
+//	@Router			/businesses/{businessId}/positions/{positionId} [delete]
 func (h *PositionHandler) DeletePosition(w http.ResponseWriter, r *http.Request) {
-	positionId := chi.URLParam(r, "id")
+	positionId := chi.URLParam(r, "positionId")
 
 	if err := h.positionService.DeletePosition(r.Context(), positionId); err != nil {
 		handleServiceError(w, err, "delete position")
@@ -126,12 +191,14 @@ func (h *PositionHandler) DeletePosition(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *PositionHandler) SetupRoutes(r chi.Router) {
-	r.Route("/positions", func(r chi.Router) {
-		r.Use(middleware.AccessAuthMiddleware(h.jwtSecret))
+	r.Route("/businesses/{businessId}/positions", func(r chi.Router) {
+		r.Use(RequireBusinessMember(h.authService, h.jwtSecret))
+		r.Route("/{positionId}", func(r chi.Router) {
+			r.Get("/", h.GetPosition)
+			r.Patch("/", h.RenamePosition)
+			r.Delete("/", h.DeletePosition)
+		})
 		r.Post("/", h.CreatePosition)
 		r.Get("/", h.GetAllPositionsByBusiness)
-		r.Get("/{id}", h.GetPosition)
-		r.Patch("/{id}", h.RenamePosition)
-		r.Delete("/{id}", h.DeletePosition)
 	})
 }

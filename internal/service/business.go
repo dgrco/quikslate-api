@@ -51,6 +51,18 @@ func (bs *BusinessService) CreateBusiness(ctx context.Context, name string) (str
 	return b.Id, nil
 }
 
+// Get all businesses a user belongs to
+// Implicit parameters set by http context: {userId}
+// (Authorization: all, but only the user may query their own)
+func (bs *BusinessService) GetBusinessesByUserId(ctx context.Context) ([]domain.Business, error) {
+	businesses, err := bs.repo.GetBusinessesByUserId(ctx, ctxkeys.GetUserId(ctx))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get businesses by user ID: %w", err)
+	}
+
+	return businesses, nil
+}
+
 // Get a Business.
 // Implicit parameters set by http context: {businessId}
 // (Authorization: admin)

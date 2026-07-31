@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/dgrco/quikslate/internal/domain"
-	"github.com/dgrco/quikslate/internal/middleware"
 	"github.com/dgrco/quikslate/internal/response"
 	"github.com/dgrco/quikslate/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -19,7 +18,7 @@ import (
 type AuthHandler struct {
 	authService *service.AuthService
 	secure      bool // should be true in production and false in development (set in Config.SecureMode)
-	jwtSecret string
+	jwtSecret   string
 }
 
 // NewAuthHandler creates an AuthHandler object.
@@ -35,9 +34,9 @@ func NewAuthHandler(authService *service.AuthService, secure bool, jwtSecret str
 // Request Body Structures
 
 type registerRequest struct {
-	Email        string `json:"email"`
-	Name				 string `json:"name"`
-	Password     string `json:"password"`
+	Email    string `json:"email"`
+	Name     string `json:"name"`
+	Password string `json:"password"`
 }
 
 type loginRequest struct {
@@ -45,24 +44,10 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
-type selectBusinessRequest struct {
-	BusinessId string `json:"business_id"`
-}
-
-type selectLocationRequest struct {
-	BusinessId string `json:"business_id"`
-	LocationId string `json:"location_id"`
-}
-
 // Response Structures
 
 type TokenResponse struct {
 	AccessToken string `json:"access_token"`
-}
-
-type LocationSelectionResponse struct {
-	BusinessId string   `json:"business_id"`
-	Locations  []string `json:"locations"`
 }
 
 // Helpers
@@ -73,6 +58,18 @@ func isEmpty(str string) bool {
 
 // Handlers
 
+// Register creates a new user account.
+//
+//	@Summary		Register
+//	@Description	Create a new user account. Returns an access_token and sets a refresh_token cookie.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		registerRequest	true	"Registration details"
+//	@Success		200		{object}	TokenResponse
+//	@Failure		400		{object}	response.errorResponse	"invalid body or missing fields"
+//	@Failure		409		{object}	response.errorResponse	"email already registered"
+//	@Router			/auth/register [post]
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
@@ -97,6 +94,18 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, TokenResponse{AccessToken: authResult.AccessToken}, http.StatusOK)
 }
 
+// Login authenticates with email and password.
+//
+//	@Summary		Login
+//	@Description	Authenticate with email and password. Returns an access_token and sets a refresh_token cookie.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		loginRequest	true	"Login credentials"
+//	@Success		200		{object}	TokenResponse
+//	@Failure		400		{object}	response.errorResponse	"invalid body or missing fields"
+//	@Failure		401		{object}	response.errorResponse	"invalid credentials"
+//	@Router			/auth/login [post]
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
@@ -118,21 +127,20 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if authResult.RequiresBusinessSelection {
-		// return businesses list + UserId, do NOT set cookie
-		response.WriteJSON(w, authResult, http.StatusOK)
-		return
-	}
-	if authResult.RequiresLocationSelection {
-		// return locations list, do NOT set cookie
-		response.WriteJSON(w, authResult, http.StatusOK)
-		return
-	}
-	// set cookie if fully authenticated
 	setRefreshTokenCookie(w, authResult.RefreshToken, h.secure)
 	response.WriteJSON(w, TokenResponse{AccessToken: authResult.AccessToken}, http.StatusOK)
 }
 
+// Refresh rotates the refresh_token cookie and issues a new access token.
+//
+//	@Summary		Refresh
+//	@Description	Rotate the refresh_token cookie (single use) and issue a new access_token.
+//	@Tags			auth
+//	@Produce		json
+//	@Success		200	{object}	TokenResponse
+//	@Failure		400	{object}	response.errorResponse	"no refresh token cookie"
+//	@Failure		401	{object}	response.errorResponse	"invalid or expired refresh token"
+//	@Router			/auth/refresh [post]
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
@@ -153,6 +161,14 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, TokenResponse{AccessToken: authResult.AccessToken}, http.StatusOK)
 }
 
+// Logout revokes the current refresh token and clears its cookie.
+//
+//	@Summary		Logout
+//	@Description	Revoke the current refresh token (if present) and clear the refresh_token cookie. Idempotent: always returns 200.
+//	@Tags			auth
+//	@Produce		json
+//	@Success		200	{object}	SimpleResponse
+//	@Router			/auth/logout [post]
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
@@ -188,75 +204,6 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, SimpleResponse{Message: "ok"}, http.StatusOK)
 }
 
-func (h *AuthHandler) SelectBusiness(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
-
-	var req selectBusinessRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.WriteError(w, ERR_INVALID_REQ_BODY, http.StatusBadRequest)
-		return
-	}
-
-	// validate request
-	if isEmpty(req.BusinessId) {
-		response.WriteError(w, "business_id is required", http.StatusBadRequest)
-		return
-	}
-
-	authResult, err := h.authService.SelectBusiness(r.Context(), req.BusinessId)
-	if err != nil {
-		handleServiceError(w, err, "select business")
-		return
-	}
-
-	if !authResult.RequiresLocationSelection {
-		// no need to select a location
-		setRefreshTokenCookie(w, authResult.RefreshToken, h.secure)
-		response.WriteJSON(w, TokenResponse{AccessToken: authResult.AccessToken}, http.StatusOK)
-		return
-	}
-
-	// return a location selection response
-	locationList := []string{}
-	for _, lr := range authResult.Locations {
-		locationList = append(locationList, lr.LocationId)
-	}
-
-	response.WriteJSON(
-		w,
-		LocationSelectionResponse{
-			BusinessId: req.BusinessId,
-			Locations:  locationList,
-		},
-		http.StatusOK,
-	)
-}
-
-func (h *AuthHandler) SelectLocation(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
-
-	var req selectLocationRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.WriteError(w, ERR_INVALID_REQ_BODY, http.StatusBadRequest)
-		return
-	}
-
-	// validate request
-	if isEmpty(req.BusinessId) || isEmpty(req.LocationId) {
-		response.WriteError(w, "business_id and location_id are required", http.StatusBadRequest)
-		return
-	}
-
-	authResult, err := h.authService.SelectLocation(r.Context(), req.BusinessId, req.LocationId)
-	if err != nil {
-		handleServiceError(w, err, "select location")
-		return
-	}
-
-	setRefreshTokenCookie(w, authResult.RefreshToken, h.secure)
-	response.WriteJSON(w, TokenResponse{AccessToken: authResult.AccessToken}, http.StatusOK)
-}
-
 func setRefreshTokenCookie(w http.ResponseWriter, token string, secure bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
@@ -274,18 +221,12 @@ func (h *AuthHandler) SetupRoutes(r chi.Router) {
 	r.Route("/auth", func(r chi.Router) {
 		// rate-limit by IP (may add per-email rate-limiting via redis in the future)
 		r.Group(func(r chi.Router) {
-			r.Use(httprate.LimitByIP(10, 1*time.Minute)) 
+			r.Use(httprate.LimitByIP(10, 1*time.Minute))
 			r.Post("/register", h.Register)
 			r.Post("/login", h.Login)
 		})
 
 		r.Post("/refresh", h.Refresh)
 		r.Post("/logout", h.Logout)
-
-		r.Group(func(r chi.Router) {
-			r.Use(middleware.AccessAuthMiddleware(h.jwtSecret))
-			r.Post("/select-business", h.SelectBusiness)
-			r.Post("/select-location", h.SelectLocation)
-		})
 	})
 }

@@ -42,15 +42,11 @@ func (ls *LocationService) CreateLocation(
 }
 
 // Get a Location given a locationId
-// (Authorization: admin)
+// (Authorization: any business member)
 func (ls *LocationService) GetLocation(
 	ctx context.Context,
 	locationId string,
 ) (domain.Location, error) {
-	if err := validateIsAdmin(ctx); err != nil {
-		return domain.Location{}, fmt.Errorf("failed to get location: %w", err)
-	}
-
 	l, err := getAndValidateLocation(ctx, ls.repo, locationId)
 	if err != nil {
 		return domain.Location{}, fmt.Errorf("failed to get location: %w", err)
@@ -59,14 +55,10 @@ func (ls *LocationService) GetLocation(
 }
 
 // Get all Locations associated to a businessId
-// (Authorization: admin)
+// (Authorization: any business member)
 func (ls *LocationService) GetAllLocations(
 	ctx context.Context,
 ) ([]domain.Location, error) {
-	if err := validateIsAdmin(ctx); err != nil {
-		return nil, fmt.Errorf("failed to get all locations: %w", err)
-	}
-
 	locations, err := ls.repo.GetLocationsByBusinessId(ctx, ctxkeys.GetBusinessId(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all locations: %w", err)

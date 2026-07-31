@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dgrco/quikslate/internal/middleware"
 	"github.com/dgrco/quikslate/internal/response"
 	"github.com/dgrco/quikslate/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -45,16 +44,32 @@ type setAdminRequest struct {
 
 // Response Structures
 
+type CreateBusinessResponse struct {
+	BusinessId string `json:"business_id"`
+}
+
 type BusinessDTO struct {
-	Id        string
-	Name      string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	Id        string    `json:"business_id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // Handlers
 
-// CreateBusiness retrieves BusinessName via the request body.
+// CreateBusiness creates a new business owned by the caller, who becomes its primary admin.
+//
+//	@Summary		Create business
+//	@Description	Create a new business. The caller becomes its primary admin.
+//	@Tags			businesses
+//	@Security		BearerAuth
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		createBusinessRequest	true	"Business details"
+//	@Success		200		{object}	CreateBusinessResponse
+//	@Failure		400		{object}	response.errorResponse
+//	@Failure		401		{object}	response.errorResponse
+//	@Router			/businesses [post]
 func (h *BusinessHandler) CreateBusiness(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
@@ -70,17 +85,53 @@ func (h *BusinessHandler) CreateBusiness(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	authResult, err := h.authService.SelectBusiness(r.Context(), businessId)
+	response.WriteJSON(w, CreateBusinessResponse{BusinessId: businessId}, http.StatusOK)
+}
+
+// GetBusinessesByUser retrieves all businesses that the authenticated user belongs to.
+//
+// @Summary Get Businesses By User
+// @Description Retrieves all businesses that the currently authenticated user belongs to.
+// @Tags businesses
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {array} []BusinessDTO
+// @Failure 401 {object} response.errorResponse
+// @Router /businesses/me [get]
+func (h *BusinessHandler) GetBusinessesByUser(w http.ResponseWriter, r *http.Request) {
+	businesses, err := h.businessService.GetBusinessesByUserId(r.Context())
 	if err != nil {
-		handleServiceError(w, err, "create business")
+		handleServiceError(w, err, "get businesses by user")
 		return
 	}
 
-	response.WriteJSON(w, authResult, http.StatusOK)
+	dtos := []BusinessDTO{}
+	for _, b := range businesses {
+		dto := BusinessDTO{
+			Id:        b.Id,
+			Name:      b.Name,
+			CreatedAt: b.CreatedAt,
+			UpdatedAt: b.UpdatedAt,
+		}
+		dtos = append(dtos, dto)
+	}
+
+	response.WriteJSON(w, dtos, http.StatusOK)
 }
 
-// GetBusiness uses context to fetch the Business.
-// Therefore, there is NO request body needed.
+// GetBusiness returns the business identified by businessId.
+//
+//	@Summary		Get business
+//	@Description	Get a business by ID. Admin only.
+//	@Tags			businesses
+//	@Security		BearerAuth
+//	@Produce		json
+//	@Param			businessId	path		string	true	"Business ID"
+//	@Success		200			{object}	BusinessDTO
+//	@Failure		401			{object}	response.errorResponse
+//	@Failure		403			{object}	response.errorResponse
+//	@Failure		404			{object}	response.errorResponse
+//	@Router			/businesses/{businessId} [get]
 func (h *BusinessHandler) GetBusiness(w http.ResponseWriter, r *http.Request) {
 	b, err := h.businessService.GetBusiness(r.Context())
 	if err != nil {
@@ -96,8 +147,21 @@ func (h *BusinessHandler) GetBusiness(w http.ResponseWriter, r *http.Request) {
 	}, http.StatusOK)
 }
 
-// RenameBusiness uses context to fetch/update the Business.
-// The new business name is retrieved via the request body.
+// RenameBusiness updates the business's name.
+//
+//	@Summary		Rename business
+//	@Description	Rename a business. Admin only.
+//	@Tags			businesses
+//	@Security		BearerAuth
+//	@Accept			json
+//	@Produce		json
+//	@Param			businessId	path		string					true	"Business ID"
+//	@Param			body		body		renameBusinessRequest	true	"New name"
+//	@Success		200			{object}	SimpleResponse
+//	@Failure		400			{object}	response.errorResponse
+//	@Failure		401			{object}	response.errorResponse
+//	@Failure		403			{object}	response.errorResponse
+//	@Router			/businesses/{businessId} [patch]
 func (h *BusinessHandler) RenameBusiness(w http.ResponseWriter, r *http.Request) {
 	// prevent DoS risk
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
@@ -116,8 +180,18 @@ func (h *BusinessHandler) RenameBusiness(w http.ResponseWriter, r *http.Request)
 	response.WriteJSON(w, SimpleResponse{Message: "business renamed"}, http.StatusOK)
 }
 
-// DeleteBusiness uses context to fetch/delete the Business.
-// Therefore, there is NO request body needed.
+// DeleteBusiness deletes the business identified by businessId.
+//
+//	@Summary		Delete business
+//	@Description	Delete a business and all of its data (locations, positions, shifts, members). Admin only.
+//	@Tags			businesses
+//	@Security		BearerAuth
+//	@Produce		json
+//	@Param			businessId	path		string	true	"Business ID"
+//	@Success		200			{object}	SimpleResponse
+//	@Failure		401			{object}	response.errorResponse
+//	@Failure		403			{object}	response.errorResponse
+//	@Router			/businesses/{businessId} [delete]
 func (h *BusinessHandler) DeleteBusiness(w http.ResponseWriter, r *http.Request) {
 	if err := h.businessService.DeleteBusiness(r.Context()); err != nil {
 		handleServiceError(w, err, "delete business")
@@ -127,8 +201,20 @@ func (h *BusinessHandler) DeleteBusiness(w http.ResponseWriter, r *http.Request)
 	response.WriteJSON(w, SimpleResponse{Message: "business deleted"}, http.StatusOK)
 }
 
-// RemoveUserFromBusiness retrieves the target userId via the params.
-// Therefore: no need to wrap the request body in MaxBytesReader.
+// RemoveUserFromBusiness removes the target user from the business, including all of their location roles and position assignments.
+//
+//	@Summary		Remove business member
+//	@Description	Remove a user from the business (and all of their location roles/position assignments). Admin only; admins cannot remove other admins.
+//	@Tags			businesses
+//	@Security		BearerAuth
+//	@Produce		json
+//	@Param			businessId	path		string	true	"Business ID"
+//	@Param			userId		path		string	true	"Target user ID"
+//	@Success		200			{object}	SimpleResponse
+//	@Failure		401			{object}	response.errorResponse
+//	@Failure		403			{object}	response.errorResponse
+//	@Failure		404			{object}	response.errorResponse
+//	@Router			/businesses/{businessId}/members/{userId} [delete]
 func (h *BusinessHandler) RemoveUserFromBusiness(w http.ResponseWriter, r *http.Request) {
 	userId := chi.URLParam(r, "userId")
 
@@ -140,8 +226,22 @@ func (h *BusinessHandler) RemoveUserFromBusiness(w http.ResponseWriter, r *http.
 	response.WriteJSON(w, SimpleResponse{Message: "user removed from business"}, http.StatusOK)
 }
 
-// SetAdminForBusinessMember retrieves the target userId via the params.
-// The new admin status is retrieved via the request body.
+// SetAdminForBusinessMember grants or revokes admin status for the target business member.
+//
+//	@Summary		Set business member admin status
+//	@Description	Grant or revoke admin status for a business member. Admin to grant admin status to a non-admin member; only the primary admin can modify another admin's status.
+//	@Tags			businesses
+//	@Security		BearerAuth
+//	@Accept			json
+//	@Produce		json
+//	@Param			businessId	path		string				true	"Business ID"
+//	@Param			userId		path		string				true	"Target user ID"
+//	@Param			body		body		setAdminRequest		true	"Desired admin status"
+//	@Success		200			{object}	SimpleResponse
+//	@Failure		400			{object}	response.errorResponse
+//	@Failure		401			{object}	response.errorResponse
+//	@Failure		403			{object}	response.errorResponse
+//	@Router			/businesses/{businessId}/members/{userId}/admin [patch]
 func (h *BusinessHandler) SetAdminForBusinessMember(w http.ResponseWriter, r *http.Request) {
 	userId := chi.URLParam(r, "userId")
 
@@ -163,9 +263,15 @@ func (h *BusinessHandler) SetAdminForBusinessMember(w http.ResponseWriter, r *ht
 
 func (h *BusinessHandler) SetupRoutes(r chi.Router) {
 	r.Route("/businesses", func(r chi.Router) {
+		// Identity-only
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.AccessAuthMiddleware(h.jwtSecret))
+			r.Use(RequireIdentity(h.authService, h.jwtSecret))
 			r.Post("/", h.CreateBusiness)
+			r.Get("/me", h.GetBusinessesByUser)
+		})
+		// Business-scoped
+		r.Route("/{businessId}", func(r chi.Router) {
+			r.Use(RequireBusinessMember(h.authService, h.jwtSecret))
 			r.Get("/", h.GetBusiness)
 			r.Patch("/", h.RenameBusiness)
 			r.Delete("/", h.DeleteBusiness)

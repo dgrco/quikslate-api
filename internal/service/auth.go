@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/dgrco/quikslate/internal/auth"
-	"github.com/dgrco/quikslate/internal/ctxkeys"
 	"github.com/dgrco/quikslate/internal/domain"
 )
 
@@ -27,12 +26,8 @@ func NewAuthService(repo domain.Repo, jwtSecret string) *AuthService {
 }
 
 type AuthResult struct {
-	AccessToken               string                `json:"access_token,omitempty"`
-	RefreshToken              string                `json:"refresh_token,omitempty"`
-	RequiresBusinessSelection bool                  `json:"requires_business_selection"`
-	Businesses                []domain.Business     `json:"businesses,omitempty"`
-	RequiresLocationSelection bool                  `json:"requires_location_selection"`
-	Locations                 []domain.LocationRole `json:"locations,omitempty"`
+	AccessToken  string `json:"access_token,omitempty"`
+	RefreshToken string `json:"refresh_token,omitempty"`
 }
 
 func (s *AuthService) Register(ctx context.Context, email, name, password string) (*AuthResult, error) {
@@ -56,8 +51,7 @@ func (s *AuthService) Register(ctx context.Context, email, name, password string
 		return nil, fmt.Errorf("failed to create user with business: %w", err)
 	}
 
-	// generate identity-only tokens (no business or location ids)
-	return s.generateTokens(ctx, s.repo, user.Id, "", "", false, false, domain.EmptyRole)
+	return s.generateTokens(ctx, s.repo, user.Id)
 }
 
 func (s *AuthService) Login(ctx context.Context, email, password string) (*AuthResult, error) {
@@ -76,42 +70,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*AuthR
 		return nil, domain.ErrInvalidCredentials
 	}
 
-	bms, err := s.repo.GetBusinessMembersByUserId(ctx, user.Id)
-	if err != nil {
-		return nil, fmt.Errorf("login error: %w", err)
-	}
-
-	businesses := []domain.Business{}
-	for _, bm := range bms {
-		b, err := s.repo.GetBusinessById(ctx, bm.BusinessId)
-		if err != nil {
-			return nil, fmt.Errorf("login error: %w", err)
-		}
-		businesses = append(businesses, b)
-	}
-
-	if len(businesses) == 0 {
-		// Identity token
-		return s.generateTokens(ctx, s.repo, user.Id, "", "", false, false, domain.EmptyRole)
-	}
-
-	if len(businesses) == 1 {
-		// since this calls SelectBusiness and we aren't going through SelectionAuthMiddleware
-		// we need to fill the context state here.
-		ctx = context.WithValue(ctx, ctxkeys.UserId, user.Id)
-		return s.SelectBusiness(ctx, businesses[0].Id)
-	}
-
-	accessToken, err := s.generateInterimAccessToken(user.Id)
-	if err != nil {
-		return nil, fmt.Errorf("login error: %w", err)
-	}
-
-	return &AuthResult{
-		AccessToken:               accessToken,
-		Businesses:                businesses,
-		RequiresBusinessSelection: true,
-	}, nil
+	return s.generateTokens(ctx, s.repo, user.Id)
 }
 
 func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthResult, error) {
@@ -131,22 +90,6 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthRe
 		return nil, domain.ErrInvalidRefreshToken
 	}
 
-	// fetch business member data for the user
-	bm, err := s.repo.GetBusinessMember(ctx, stored.UserId, stored.BusinessId)
-	if err != nil {
-		return nil, domain.ErrNotFound
-	}
-
-	locationId := stored.LocationId
-	var role domain.LRole
-	if stored.LocationId != "" && !bm.IsAdmin {
-		lr, err := s.repo.GetLocationRole(ctx, stored.UserId, stored.LocationId, stored.BusinessId)
-		if err != nil {
-			return nil, domain.ErrNotFound
-		}
-		role = lr.Role
-	}
-
 	// Wrap in transaction:
 	tx, err := s.repo.BeginTransaction(ctx)
 	if err != nil {
@@ -161,7 +104,7 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthRe
 		return nil, fmt.Errorf("failed to rotate refresh token: %w", err)
 	}
 
-	result, err := s.generateTokens(ctx, txRepo, bm.UserId, bm.BusinessId, locationId, bm.IsPrimaryAdmin, bm.IsAdmin, role)
+	result, err := s.generateTokens(ctx, txRepo, stored.UserId)
 	if err != nil {
 		return nil, err
 	}
@@ -178,75 +121,14 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
 	return s.repo.DeleteRefreshToken(ctx, hashedToken)
 }
 
-func (s *AuthService) SelectBusiness(ctx context.Context, businessId string) (*AuthResult, error) {
-	userId := ctxkeys.GetUserId(ctx)
-
-	bm, err := s.repo.GetBusinessMember(ctx, userId, businessId)
-	if err != nil {
-		return nil, fmt.Errorf("failed to select business: %w", err)
-	}
-
-	lrs, err := s.repo.GetLocationRolesByUserAndBusiness(ctx, userId, businessId)
-	if err != nil {
-		return nil, fmt.Errorf("failed to select business: %w", err)
-	}
-
-	if bm.IsAdmin && len(lrs) == 0 {
-		return s.generateTokens(ctx, s.repo, userId, businessId, domain.EmptyLocation, bm.IsPrimaryAdmin, bm.IsAdmin, domain.EmptyRole)
-	} else if len(lrs) == 1 {
-		return s.generateTokens(ctx, s.repo, userId, businessId, lrs[0].LocationId, bm.IsPrimaryAdmin, bm.IsAdmin, lrs[0].Role)
-	} else {
-		// Many locations -> requires selection
-		accessToken, err := s.generateInterimAccessToken(userId)
-		if err != nil {
-			return nil, fmt.Errorf("select business error: %w", err)
-		}
-		return &AuthResult{AccessToken: accessToken, Locations: lrs, RequiresLocationSelection: true}, nil
-	}
-}
-
-func (s *AuthService) SelectLocation(ctx context.Context, businessId, locationId string) (*AuthResult, error) {
-	userId := ctxkeys.GetUserId(ctx)
-
-	// verify the requested user belongs to the requested business
-	bm, err := s.repo.GetBusinessMember(ctx, userId, businessId)
-	if err != nil {
-		return nil, fmt.Errorf("failed to select location: %w", err)
-	}
-
-	// verify the requested location belongs to the requested business
-	location, err := s.repo.GetLocationById(ctx, locationId)
-	if err != nil {
-		return nil, fmt.Errorf("failed to select location: %w", err)
-	}
-	if location.BusinessId != businessId {
-		return nil, domain.ErrForbidden
-	}
-
-	role := domain.EmptyRole
-	if !bm.IsAdmin {
-		lr, err := s.repo.GetLocationRole(ctx, userId, locationId, businessId)
-		if err != nil {
-			return nil, fmt.Errorf("failed to select location: %w", err)
-		}
-		role = lr.Role
-	}
-	return s.generateTokens(ctx, s.repo, bm.UserId, bm.BusinessId, locationId, bm.IsPrimaryAdmin, bm.IsAdmin, role)
-}
-
 // generateTokens creates a JWT and a refresh token for a given user
 func (s *AuthService) generateTokens(
 	ctx context.Context,
 	repo domain.Repo,
-	userId,
-	businessId,
-	locationId string,
-	isPrimaryAdmin,
-	isAdmin bool,
-	role domain.LRole,
+	userId string,
 ) (*AuthResult, error) {
 	// generate JWT
-	accessToken, err := auth.GenerateAccessToken(userId, businessId, locationId, isPrimaryAdmin, isAdmin, role, s.jwtSecret)
+	accessToken, err := auth.GenerateAccessToken(userId, s.jwtSecret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
@@ -262,20 +144,12 @@ func (s *AuthService) generateTokens(
 
 	// store hashed refresh token in database
 	expiresAt := time.Now().Add(30 * 24 * time.Hour)
-	_, err = repo.CreateRefreshToken(ctx, userId, businessId, locationId, hashedToken, expiresAt)
+	_, err = repo.CreateRefreshToken(ctx, userId, hashedToken, expiresAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store refresh token: %w", err)
 	}
 
-	return &AuthResult{
-		AccessToken:               accessToken,
-		RefreshToken:              refreshToken,
-		RequiresBusinessSelection: false,
-	}, nil
-}
-
-func (s *AuthService) generateInterimAccessToken(userId string) (string, error) {
-	return auth.GenerateAccessToken(userId, "", "", false, false, domain.EmptyRole, s.jwtSecret)
+	return &AuthResult{AccessToken: accessToken, RefreshToken: refreshToken}, nil
 }
 
 // generateSecureToken generates n random bytes and hex encodes each,
@@ -293,4 +167,31 @@ func generateSecureToken(n int) (string, error) {
 func hashToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
+}
+
+// Authz
+
+func (s *AuthService) GetBusinessMemberAuthzContext(
+	ctx context.Context,
+	userId,
+	businessId string,
+) (domain.BusinessMemberAuthzContext, error) {
+	ac, err := s.repo.GetBusinessMemberAuthzContext(ctx, userId, businessId)
+	if err != nil {
+		return domain.BusinessMemberAuthzContext{}, fmt.Errorf("failed to get business member authorization context: %w", err)
+	}
+	return ac, nil
+}
+
+func (s *AuthService) GetLocationMemberAuthzContext(
+	ctx context.Context,
+	userId,
+	businessId,
+	locationId string,
+) (domain.LocationMemberAuthzContext, error) {
+	ac, err := s.repo.GetLocationMemberAuthzContext(ctx, userId, businessId, locationId)
+	if err != nil {
+		return domain.LocationMemberAuthzContext{}, fmt.Errorf("failed to get location member authorization context: %w", err)
+	}
+	return ac, nil
 }

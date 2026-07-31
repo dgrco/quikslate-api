@@ -20,6 +20,12 @@ const (
 		FROM businesses
 		WHERE id = $1
 	`
+	getBusinessesByUserIdQuery = `
+		SELECT b.id, b.name, b.created_at, b.updated_at
+		FROM businesses b
+		JOIN business_members bm ON bm.business_id = b.id
+		WHERE bm.user_id = $1
+	`
 	changeBusinessNameQuery = `
 		UPDATE businesses
 		SET name = $1, updated_at = NOW()
@@ -64,6 +70,28 @@ func (r *PgRepository) GetBusinessById(ctx context.Context, id string) (domain.B
 		}
 	}
 	return b, nil
+}
+
+func (r *PgRepository) GetBusinessesByUserId(ctx context.Context, userId string) ([]domain.Business, error) {
+	// In the future I may separate this into a separate function like the rest
+	rows, err := r.exec.Query(ctx, getBusinessesByUserIdQuery, userId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get businesses by user ID: %w", err)
+	}
+	defer rows.Close()
+
+	businesses := []domain.Business{}
+	for rows.Next() {
+		var b domain.Business
+		if err := rows.Scan(&b.Id, &b.Name, &b.CreatedAt, &b.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan business: %w", err)
+		}
+		businesses = append(businesses, b)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate businesses: %w", err)
+	}
+	return businesses, nil
 }
 
 func (r *PgRepository) ChangeBusinessName(ctx context.Context, id, newName string) error {

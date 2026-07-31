@@ -33,20 +33,20 @@ const (
 )
 
 func scanUser(row pgx.Row) (domain.User, error) {
-    var u domain.User
-    err := row.Scan(
-			&u.Id,
-			&u.Email,
-			&u.Name,
-			&u.Password,
-			&u.CreatedAt,
-			&u.UpdatedAt,
-		)
-		if err != nil {
-			return domain.User{}, err
-		}
-		return u, nil
+	var u domain.User
+	err := row.Scan(
+		&u.Id,
+		&u.Email,
+		&u.Name,
+		&u.Password,
+		&u.CreatedAt,
+		&u.UpdatedAt,
+	)
+	if err != nil {
+		return domain.User{}, err
 	}
+	return u, nil
+}
 
 // Implement UserRepository interface for PgRepository
 

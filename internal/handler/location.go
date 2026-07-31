@@ -52,8 +52,21 @@ type MultipleLocationResponse struct {
 
 // Handlers
 
-// CreateLocation uses context to fetch the BusinessId.
-// The location name (and optionally address) is retrieved via the request body.
+// CreateLocation creates a new location under the business identified by businessId.
+//
+//	@Summary		Create location
+//	@Description	Create a new location under a business. Admin only.
+//	@Tags			locations
+//	@Security		BearerAuth
+//	@Accept			json
+//	@Produce		json
+//	@Param			businessId	path		string					true	"Business ID"
+//	@Param			body		body		createLocationRequest	true	"Location details"
+//	@Success		200			{object}	SingleLocationResponse
+//	@Failure		400			{object}	response.errorResponse
+//	@Failure		401			{object}	response.errorResponse
+//	@Failure		403			{object}	response.errorResponse
+//	@Router			/businesses/{businessId}/locations [post]
 func (h *LocationHandler) CreateLocation(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
@@ -72,8 +85,20 @@ func (h *LocationHandler) CreateLocation(w http.ResponseWriter, r *http.Request)
 	response.WriteJSON(w, SingleLocationResponse{Location: l}, http.StatusOK)
 }
 
-// GetLocation uses context to fetch the BusinessId.
-// The locationId is retrieved via the params.
+// GetLocation returns the location identified by locationId.
+//
+//	@Summary		Get location
+//	@Description	Get a single location by ID. Business member only (non-admins restricted to their session location).
+//	@Tags			locations
+//	@Security		BearerAuth
+//	@Produce		json
+//	@Param			businessId	path		string	true	"Business ID"
+//	@Param			locationId	path		string	true	"Location ID"
+//	@Success		200			{object}	SingleLocationResponse
+//	@Failure		401			{object}	response.errorResponse
+//	@Failure		403			{object}	response.errorResponse
+//	@Failure		404			{object}	response.errorResponse
+//	@Router			/businesses/{businessId}/locations/{locationId} [get]
 func (h *LocationHandler) GetLocation(w http.ResponseWriter, r *http.Request) {
 	locationId := chi.URLParam(r, "locationId")
 
@@ -86,8 +111,18 @@ func (h *LocationHandler) GetLocation(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, SingleLocationResponse{Location: l}, http.StatusOK)
 }
 
-// GetAllLocations uses context to fetch the BusinessId.
-// Therefore: no need to wrap the request body in MaxBytesReader.
+// GetAllLocations returns every location belonging to the business identified by businessId.
+//
+//	@Summary		List locations
+//	@Description	List all locations for a business. Business member only.
+//	@Tags			locations
+//	@Security		BearerAuth
+//	@Produce		json
+//	@Param			businessId	path		string	true	"Business ID"
+//	@Success		200			{object}	MultipleLocationResponse
+//	@Failure		401			{object}	response.errorResponse
+//	@Failure		403			{object}	response.errorResponse
+//	@Router			/businesses/{businessId}/locations [get]
 func (h *LocationHandler) GetAllLocations(w http.ResponseWriter, r *http.Request) {
 	ls, err := h.locationService.GetAllLocations(r.Context())
 	if err != nil {
@@ -98,11 +133,22 @@ func (h *LocationHandler) GetAllLocations(w http.ResponseWriter, r *http.Request
 	response.WriteJSON(w, MultipleLocationResponse{Locations: ls}, http.StatusOK)
 }
 
-// UpdateLocation does not use context for state.
-// This retrieves optional values from the request body:
-// - name
-// - address
-// This is a partial update operation.
+// UpdateLocation partially updates the location identified by locationId.
+//
+//	@Summary		Update location
+//	@Description	Partially update a location's name and/or address. Admin only.
+//	@Tags			locations
+//	@Security		BearerAuth
+//	@Accept			json
+//	@Produce		json
+//	@Param			businessId	path		string					true	"Business ID"
+//	@Param			locationId	path		string					true	"Location ID"
+//	@Param			body		body		updateLocationRequest	true	"Fields to update"
+//	@Success		200			{object}	SimpleResponse
+//	@Failure		400			{object}	response.errorResponse
+//	@Failure		401			{object}	response.errorResponse
+//	@Failure		403			{object}	response.errorResponse
+//	@Router			/businesses/{businessId}/locations/{locationId} [patch]
 func (h *LocationHandler) UpdateLocation(w http.ResponseWriter, r *http.Request) {
 	locationId := chi.URLParam(r, "locationId")
 
@@ -129,8 +175,19 @@ func (h *LocationHandler) UpdateLocation(w http.ResponseWriter, r *http.Request)
 	response.WriteJSON(w, SimpleResponse{"location updated"}, http.StatusOK)
 }
 
-// DeleteLocation uses context to fetch the BusinessId.
-// The locationId is retrieved via the params.
+// DeleteLocation deletes the location identified by locationId.
+//
+//	@Summary		Delete location
+//	@Description	Delete a location and its dependent shifts/roles. Admin only.
+//	@Tags			locations
+//	@Security		BearerAuth
+//	@Produce		json
+//	@Param			businessId	path		string	true	"Business ID"
+//	@Param			locationId	path		string	true	"Location ID"
+//	@Success		200			{object}	SimpleResponse
+//	@Failure		401			{object}	response.errorResponse
+//	@Failure		403			{object}	response.errorResponse
+//	@Router			/businesses/{businessId}/locations/{locationId} [delete]
 func (h *LocationHandler) DeleteLocation(w http.ResponseWriter, r *http.Request) {
 	locationId := chi.URLParam(r, "locationId")
 

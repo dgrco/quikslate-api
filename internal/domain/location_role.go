@@ -10,7 +10,7 @@ type LRole string
 
 const (
 	Employee     LRole = "employee"
-	Manager      LRole = "manager"			 // manages employees
+	Manager      LRole = "manager"       // manages employees
 	LocationLead LRole = "location_lead" // manages (leads) all roles at a location
 	EmptyRole    LRole = ""              // for admins/identity-only
 )

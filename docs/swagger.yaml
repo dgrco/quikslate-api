@@ -1,0 +1,1585 @@
+basePath: /
+definitions:
+  github_com_dgrco_quikslate_internal_domain.EmployeePosition:
+    properties:
+      position_id:
+        type: string
+      user_id:
+        type: string
+    type: object
+  github_com_dgrco_quikslate_internal_domain.LRole:
+    enum:
+    - employee
+    - manager
+    - location_lead
+    - ""
+    type: string
+    x-enum-comments:
+      EmptyRole: for admins/identity-only
+      LocationLead: manages (leads) all roles at a location
+      Manager: manages employees
+    x-enum-descriptions:
+    - ""
+    - manages employees
+    - manages (leads) all roles at a location
+    - for admins/identity-only
+    x-enum-varnames:
+    - Employee
+    - Manager
+    - LocationLead
+    - EmptyRole
+  github_com_dgrco_quikslate_internal_domain.Location:
+    properties:
+      address:
+        type: string
+      business_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_dgrco_quikslate_internal_domain.Position:
+    properties:
+      business_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_dgrco_quikslate_internal_domain.Shift:
+    properties:
+      created_at:
+        type: string
+      end_time:
+        type: string
+      id:
+        type: string
+      location_id:
+        type: string
+      position_id:
+        type: string
+      start_time:
+        type: string
+      status:
+        $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.ShiftStatus'
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  github_com_dgrco_quikslate_internal_domain.ShiftStatus:
+    enum:
+    - draft
+    - assigned
+    - uncovered
+    - covered
+    - cancelled
+    type: string
+    x-enum-varnames:
+    - Draft
+    - Assigned
+    - Uncovered
+    - Covered
+    - Cancelled
+  github_com_dgrco_quikslate_internal_response.errorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  github_com_dgrco_quikslate_internal_service.InviteDTO:
+    properties:
+      business_name:
+        type: string
+      email:
+        type: string
+      expires_at:
+        type: string
+      role:
+        $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.LRole'
+    type: object
+  internal_handler.AcceptInviteResponse:
+    properties:
+      business_id:
+        type: string
+    type: object
+  internal_handler.BusinessDTO:
+    properties:
+      business_id:
+        type: string
+      created_at:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  internal_handler.CreateBusinessResponse:
+    properties:
+      business_id:
+        type: string
+    type: object
+  internal_handler.CreateInviteResponse:
+    properties:
+      invite_token:
+        type: string
+    type: object
+  internal_handler.MultipleEmployeePositionResponse:
+    properties:
+      positions:
+        items:
+          $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.EmployeePosition'
+        type: array
+    type: object
+  internal_handler.MultipleLocationResponse:
+    properties:
+      locations:
+        items:
+          $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.Location'
+        type: array
+    type: object
+  internal_handler.MultiplePositionResponse:
+    properties:
+      positions:
+        items:
+          $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.Position'
+        type: array
+    type: object
+  internal_handler.MultipleShiftResponse:
+    properties:
+      shifts:
+        items:
+          $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.Shift'
+        type: array
+    type: object
+  internal_handler.SimpleResponse:
+    properties:
+      message:
+        type: string
+    type: object
+  internal_handler.SingleLocationResponse:
+    properties:
+      location:
+        $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.Location'
+    type: object
+  internal_handler.SinglePositionResponse:
+    properties:
+      position:
+        $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.Position'
+    type: object
+  internal_handler.SingleShiftResponse:
+    properties:
+      shift:
+        $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.Shift'
+    type: object
+  internal_handler.TokenResponse:
+    properties:
+      access_token:
+        type: string
+    type: object
+  internal_handler.addPositionRequest:
+    properties:
+      position_id:
+        type: string
+    type: object
+  internal_handler.assignShiftRequest:
+    properties:
+      user_id:
+        type: string
+    type: object
+  internal_handler.createBusinessRequest:
+    properties:
+      business_name:
+        type: string
+    type: object
+  internal_handler.createInviteRequest:
+    properties:
+      email:
+        type: string
+      location_id:
+        type: string
+      target_role:
+        $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.LRole'
+    type: object
+  internal_handler.createLocationRequest:
+    properties:
+      address:
+        type: string
+      name:
+        type: string
+    type: object
+  internal_handler.createPositionRequest:
+    properties:
+      name:
+        type: string
+    type: object
+  internal_handler.createShiftRequest:
+    properties:
+      end_time:
+        type: string
+      position_id:
+        type: string
+      start_time:
+        type: string
+      status:
+        $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.ShiftStatus'
+      user_id:
+        type: string
+    type: object
+  internal_handler.loginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  internal_handler.registerRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+    type: object
+  internal_handler.renameBusinessRequest:
+    properties:
+      business_name:
+        type: string
+    type: object
+  internal_handler.renamePositionRequest:
+    properties:
+      name:
+        type: string
+    type: object
+  internal_handler.setAdminRequest:
+    properties:
+      admin:
+        type: boolean
+    type: object
+  internal_handler.updateLocationRequest:
+    properties:
+      address:
+        type: string
+      name:
+        type: string
+    type: object
+  internal_handler.updateShiftRequest:
+    properties:
+      end_time:
+        type: string
+      start_time:
+        type: string
+      status:
+        $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.ShiftStatus'
+    type: object
+info:
+  contact: {}
+  description: Scheduling API for businesses, locations, positions, shifts, and employees.
+  title: QuikSlate API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate with email and password. Returns an access_token and
+        sets a refresh_token cookie.
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.TokenResponse'
+        "400":
+          description: invalid body or missing fields
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "401":
+          description: invalid credentials
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      summary: Login
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      description: 'Revoke the current refresh token (if present) and clear the refresh_token
+        cookie. Idempotent: always returns 200.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+      summary: Logout
+      tags:
+      - auth
+  /auth/refresh:
+    post:
+      description: Rotate the refresh_token cookie (single use) and issue a new access_token.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.TokenResponse'
+        "400":
+          description: no refresh token cookie
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "401":
+          description: invalid or expired refresh token
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      summary: Refresh
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account. Returns an access_token and sets a refresh_token
+        cookie.
+      parameters:
+      - description: Registration details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.registerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.TokenResponse'
+        "400":
+          description: invalid body or missing fields
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "409":
+          description: email already registered
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      summary: Register
+      tags:
+      - auth
+  /businesses:
+    post:
+      consumes:
+      - application/json
+      description: Create a new business. The caller becomes its primary admin.
+      parameters:
+      - description: Business details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.createBusinessRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.CreateBusinessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create business
+      tags:
+      - businesses
+  /businesses/{businessId}:
+    delete:
+      description: Delete a business and all of its data (locations, positions, shifts,
+        members). Admin only.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete business
+      tags:
+      - businesses
+    get:
+      description: Get a business by ID. Admin only.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.BusinessDTO'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get business
+      tags:
+      - businesses
+    patch:
+      consumes:
+      - application/json
+      description: Rename a business. Admin only.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: New name
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.renameBusinessRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Rename business
+      tags:
+      - businesses
+  /businesses/{businessId}/employees/{userId}/positions:
+    get:
+      description: List all positions assigned to a user within the business. Admin,
+        Manager, or LocationLead (any location in the business).
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Target user ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.MultipleEmployeePositionResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: List employee positions
+      tags:
+      - employees
+    post:
+      consumes:
+      - application/json
+      description: Assign a position to a user. Admin, Manager, or LocationLead (any
+        location in the business).
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Target user ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      - description: Position to add
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.addPositionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Add employee position
+      tags:
+      - employees
+  /businesses/{businessId}/employees/{userId}/positions/{positionId}:
+    delete:
+      description: Remove a position from a user. Admin only.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Target user ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      - description: Position ID
+        in: path
+        name: positionId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove employee position
+      tags:
+      - employees
+  /businesses/{businessId}/invites:
+    post:
+      consumes:
+      - application/json
+      description: Invite an email address to join the business at a location with
+        a target role. Admin, or LocationLead at the target location (may only invite
+        Managers or Employees, see canActOnRole).
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Invite details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.createInviteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.CreateInviteResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create invite
+      tags:
+      - invites
+  /businesses/{businessId}/invites/{token}:
+    get:
+      description: Preview a pending invite by its raw token (email, business name,
+        role, expiry). No authentication required.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Raw invite token
+        in: path
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_service.InviteDTO'
+        "404":
+          description: invite not found, expired, or already accepted
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      summary: Preview invite
+      tags:
+      - invites
+  /businesses/{businessId}/invites/{token}/accept:
+    post:
+      description: Accept a pending invite as the authenticated caller, joining the
+        business at the invited location/role.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Raw invite token
+        in: path
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.AcceptInviteResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "404":
+          description: invite not found, expired, or already accepted
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Accept invite
+      tags:
+      - invites
+  /businesses/{businessId}/locations:
+    get:
+      description: List all locations for a business. Business member only.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.MultipleLocationResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: List locations
+      tags:
+      - locations
+    post:
+      consumes:
+      - application/json
+      description: Create a new location under a business. Admin only.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.createLocationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SingleLocationResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create location
+      tags:
+      - locations
+  /businesses/{businessId}/locations/{locationId}:
+    delete:
+      description: Delete a location and its dependent shifts/roles. Admin only.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete location
+      tags:
+      - locations
+    get:
+      description: Get a single location by ID. Business member only (non-admins restricted
+        to their session location).
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SingleLocationResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get location
+      tags:
+      - locations
+    patch:
+      consumes:
+      - application/json
+      description: Partially update a location's name and/or address. Admin only.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.updateLocationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update location
+      tags:
+      - locations
+  /businesses/{businessId}/locations/{locationId}/shifts:
+    get:
+      description: List all shifts at a location. Any member of the location (Admin,
+        LocationLead, Manager, or Employee).
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.MultipleShiftResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: List shifts
+      tags:
+      - shifts
+    post:
+      consumes:
+      - application/json
+      description: Create a new shift at a location, optionally pre-assigned to a
+        user. Admin, Manager, or LocationLead.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      - description: Shift details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.createShiftRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SingleShiftResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create shift
+      tags:
+      - shifts
+  /businesses/{businessId}/locations/{locationId}/shifts/{shiftId}:
+    delete:
+      description: Delete a shift. Admin only.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      - description: Shift ID
+        in: path
+        name: shiftId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete shift
+      tags:
+      - shifts
+    get:
+      description: Get a single shift by ID. Any member of the shift's location (Admin,
+        LocationLead, Manager, or Employee).
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      - description: Shift ID
+        in: path
+        name: shiftId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SingleShiftResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get shift
+      tags:
+      - shifts
+    patch:
+      consumes:
+      - application/json
+      description: Partially update a shift's status, start_time, and/or end_time.
+        Admin, Manager, or LocationLead; if the shift is assigned, caller must be
+        authorized to act on the assigned user's role (see canActOnRole).
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      - description: Shift ID
+        in: path
+        name: shiftId
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.updateShiftRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update shift
+      tags:
+      - shifts
+  /businesses/{businessId}/locations/{locationId}/shifts/{shiftId}/assign:
+    patch:
+      consumes:
+      - application/json
+      description: Assign a shift to a user. Admin, Manager, or LocationLead; caller
+        must be authorized to act on the target user's role (see canActOnRole).
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      - description: Shift ID
+        in: path
+        name: shiftId
+        required: true
+        type: string
+      - description: Target user
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.assignShiftRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Assign shift
+      tags:
+      - shifts
+  /businesses/{businessId}/locations/{locationId}/shifts/{shiftId}/cancel:
+    patch:
+      description: Mark a shift as cancelled. Admin, Manager, or LocationLead; if
+        the shift is assigned, caller must be authorized to act on the assigned user's
+        role (see canActOnRole).
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      - description: Shift ID
+        in: path
+        name: shiftId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cancel shift
+      tags:
+      - shifts
+  /businesses/{businessId}/locations/{locationId}/shifts/{shiftId}/unassign:
+    patch:
+      description: Remove the assigned user from a shift. Admin, Manager, or LocationLead;
+        caller must be authorized to act on the assigned user's role (see canActOnRole).
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      - description: Shift ID
+        in: path
+        name: shiftId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Unassign shift
+      tags:
+      - shifts
+  /businesses/{businessId}/members/{userId}:
+    delete:
+      description: Remove a user from the business (and all of their location roles/position
+        assignments). Admin only; admins cannot remove other admins.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Target user ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove business member
+      tags:
+      - businesses
+  /businesses/{businessId}/members/{userId}/admin:
+    patch:
+      consumes:
+      - application/json
+      description: Grant or revoke admin status for a business member. Admin to grant
+        admin status to a non-admin member; only the primary admin can modify another
+        admin's status.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Target user ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      - description: Desired admin status
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.setAdminRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set business member admin status
+      tags:
+      - businesses
+  /businesses/{businessId}/positions:
+    get:
+      description: List all positions for a business. Business member only.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.MultiplePositionResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: List positions
+      tags:
+      - positions
+    post:
+      consumes:
+      - application/json
+      description: Create a new position (job role, business-wide) under a business.
+        Admin only.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Position details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.createPositionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SinglePositionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create position
+      tags:
+      - positions
+  /businesses/{businessId}/positions/{positionId}:
+    delete:
+      description: Delete a position. Admin only.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Position ID
+        in: path
+        name: positionId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete position
+      tags:
+      - positions
+    get:
+      description: Get a single position by ID. Business member only.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Position ID
+        in: path
+        name: positionId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SinglePositionResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get position
+      tags:
+      - positions
+    patch:
+      consumes:
+      - application/json
+      description: Rename a position. Admin only.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Position ID
+        in: path
+        name: positionId
+        required: true
+        type: string
+      - description: New name
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.renamePositionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Rename position
+      tags:
+      - positions
+  /businesses/me:
+    get:
+      description: Retrieves all businesses that the currently authenticated user
+        belongs to.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              items:
+                $ref: '#/definitions/internal_handler.BusinessDTO'
+              type: array
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get Businesses By User
+      tags:
+      - businesses
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

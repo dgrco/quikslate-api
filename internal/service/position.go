@@ -41,15 +41,11 @@ func (ps *PositionService) CreatePosition(
 }
 
 // Get a Position
-// (Authorization: admin)
+// (Authorization: any business member)
 func (ps *PositionService) GetPosition(
 	ctx context.Context,
 	positionId string,
 ) (domain.Position, error) {
-	if err := validateIsAdmin(ctx); err != nil {
-		return domain.Position{}, fmt.Errorf("failed to get position: %w", err)
-	}
-
 	p, err := getAndValidatePosition(ctx, ps.repo, positionId)
 	if err != nil {
 		return domain.Position{}, fmt.Errorf("failed to get position: %w", err)
@@ -59,12 +55,8 @@ func (ps *PositionService) GetPosition(
 }
 
 // Get all Positions that exist in a Business
-// (Authorization: admin)
+// (Authorization: any business member)
 func (ps *PositionService) GetAllPositionsByBusiness(ctx context.Context) ([]domain.Position, error) {
-	if err := validateIsAdmin(ctx); err != nil {
-		return nil, fmt.Errorf("failed to get all positions by business: %w", err)
-	}
-
 	positions, err := ps.repo.GetPositionsByBusinessId(ctx, ctxkeys.GetBusinessId(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all positions by business: %w", err)

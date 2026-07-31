@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	_ "github.com/dgrco/quikslate/docs"
 	"github.com/dgrco/quikslate/internal/config"
 	"github.com/dgrco/quikslate/internal/database"
 	"github.com/dgrco/quikslate/internal/handler"
@@ -12,8 +13,17 @@ import (
 	"github.com/dgrco/quikslate/internal/service"
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
+// @title						QuikSlate API
+// @version					1.0
+// @description				Scheduling API for businesses, locations, positions, shifts, and employees.
+// @BasePath					/
+// @securityDefinitions.apikey	BearerAuth
+// @in							header
+// @name						Authorization
 func main() {
 	// Load environment
 	cfg := config.Load()
@@ -56,11 +66,21 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(chiMiddleware.Logger)
 	r.Use(chiMiddleware.Recoverer)
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   cfg.CorsOriginList(),
+		AllowedMethods:   []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}))
 
 	// Route Setup
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Hi from Quikslate :)"))
 	})
+
+	// Swagger UI + spec, served at /swagger/index.html
+	r.Get("/swagger/*", httpSwagger.WrapHandler)
 
 	authHandler.SetupRoutes(r)
 	businessHandler.SetupRoutes(r)

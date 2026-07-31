@@ -39,7 +39,7 @@ func (r *PgRepository) BeginTransaction(ctx context.Context) (domain.Tx, error) 
 func (r *PgRepository) WithTx(tx domain.Tx) domain.Repo {
 	// We can do interface-to-interface conversion!
 	// This checks if the underlying value also implements pgx.Tx (which it should)
-	pgxTx, ok := tx.(pgx.Tx) 
+	pgxTx, ok := tx.(pgx.Tx)
 	if !ok {
 		panic(fmt.Sprintf("repo.WithTx: domain.Tx of type %T did not originate from PgRepository.BeginTransaction", tx))
 	}

@@ -16,18 +16,6 @@ func validateIsAdmin(ctx context.Context) error {
 	return nil
 }
 
-// validateIsAdminOrLocationLead checks for admin access or a LocationLead session.
-// Admin-only sessions (no location) pass. LocationLead sessions pass if they have a location.
-func validateIsAdminOrLocationLead(ctx context.Context) error {
-	if ctxkeys.GetIsAdmin(ctx) {
-		return nil
-	}
-	if ctxkeys.GetRole(ctx) == domain.LocationLead && ctxkeys.GetLocationId(ctx) != "" {
-		return nil
-	}
-	return domain.ErrForbidden
-}
-
 // getAndValidateLocation returns the Location if it belongs to the requestor's
 // business. Non-admins are further restricted to their session location.
 func getAndValidateLocation(
@@ -102,29 +90,6 @@ func requireLocationRole(ctx context.Context, roles ...domain.LRole) (string, er
 		return locationId, nil
 	}
 	return "", domain.ErrForbidden
-}
-
-// requireAdminOrManagerAtOwnLocation enforces business-wide admin access, or
-// a Manager acting within their own location. Unlike requireLocationRole, an
-// admin-only session (no location) is allowed here: positions are a
-// business-wide concept, only a Manager's authority over them is 
-// location-limited. Return the caller's own locationId when the caller is a
-// non-admin Manager (empty string for admins), for use in a follow-up check
-// against the target resource.
-// Use for employee-position assignment.
-func requireAdminOrManagerAtOwnLocation(ctx context.Context) (string, error) {
-	if ctxkeys.GetIsAdmin(ctx) {
-		return "", nil
-	}
-	role := ctxkeys.GetRole(ctx)
-	if role != domain.Manager && role != domain.LocationLead {
-		return "", domain.ErrForbidden
-	}
-	locationId := ctxkeys.GetLocationId(ctx)
-	if locationId == "" {
-		return "", domain.ErrForbidden
-	}
-	return locationId, nil
 }
 
 // canActOnRole determines if the caller is authorized to act on

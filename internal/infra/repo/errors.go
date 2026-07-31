@@ -2,5 +2,5 @@ package repo
 
 // Error codes
 const (
-	ErrPgUniqueConstraintViolation	= "23505"
+	ErrPgUniqueConstraintViolation = "23505"
 )

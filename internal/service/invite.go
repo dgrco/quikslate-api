@@ -33,29 +33,42 @@ type InviteDTO struct {
 }
 
 // CreateInvite creates an outstanding invite to a (potential) user's email
-// (Authorization: Admin, LocationLead)
+// (Authorization: Admin, or LocationLead at the target location)
 func (s *InviteService) CreateInvite(
 	ctx context.Context,
 	email string,
 	locationId string,
 	targetRole domain.LRole,
 ) (InviteResult, error) {
-	if err := validateIsAdminOrLocationLead(ctx); err != nil {
-		return InviteResult{}, fmt.Errorf("failed to create invite: %w", err)
-	}
 	businessId := ctxkeys.GetBusinessId(ctx)
 
-	if _, err := getAndValidateLocation(ctx, s.repo, locationId); err != nil {
+	// This route is business-scoped (RequireBusinessMember), so ctxkeys.Role/
+	// LocationId are never set — look up the caller's role at the invite's
+	// target location directly instead of trusting session context.
+	l, err := s.repo.GetLocationById(ctx, locationId)
+	if err != nil {
 		return InviteResult{}, fmt.Errorf("failed to create invite: %w", err)
+	}
+	if l.BusinessId != businessId {
+		return InviteResult{}, fmt.Errorf("failed to create invite: %w", domain.ErrForbidden)
+	}
+
+	callerRole := domain.EmptyRole
+	if !ctxkeys.GetIsAdmin(ctx) {
+		lr, err := s.repo.GetLocationRole(ctx, ctxkeys.GetUserId(ctx), locationId, businessId)
+		if err != nil || lr.Role != domain.LocationLead {
+			return InviteResult{}, fmt.Errorf("failed to create invite: %w", domain.ErrForbidden)
+		}
+		callerRole = lr.Role
 	}
 
 	// Enforce caller -> target role hierarchy
-	if !canActOnRole(ctxkeys.GetRole(ctx), targetRole) {
+	if !canActOnRole(callerRole, targetRole) {
 		return InviteResult{}, domain.ErrForbidden
 	}
 
 	// Precondition check: user must not already have a pending invite
-	_, err := s.repo.GetPendingInviteByEmailAndBusinessId(ctx, email, businessId)
+	_, err = s.repo.GetPendingInviteByEmailAndBusinessId(ctx, email, businessId)
 	if err == nil {
 		// pending invite already exists
 		return InviteResult{}, fmt.Errorf("failed to create invite: %w", domain.ErrAlreadyExists)
@@ -122,10 +135,10 @@ func (s *InviteService) PreviewInviteByToken(ctx context.Context, token string) 
 	}
 
 	dto := InviteDTO{
-		Email: inv.Email,
+		Email:        inv.Email,
 		BusinessName: b.Name,
-		Role: inv.Role,
-		ExpiresAt: inv.ExpiresAt,
+		Role:         inv.Role,
+		ExpiresAt:    inv.ExpiresAt,
 	}
 
 	return dto, nil

@@ -24,6 +24,7 @@ func ValidateBusinessName(businessName string) error {
 type BusinessRepository interface {
 	CreateBusiness(ctx context.Context, name string) (Business, error)
 	GetBusinessById(ctx context.Context, id string) (Business, error)
+	GetBusinessesByUserId(ctx context.Context, userId string) ([]Business, error)
 	ChangeBusinessName(ctx context.Context, id, newName string) error
 	DeleteBusiness(ctx context.Context, id string) error
 }

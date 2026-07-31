@@ -18,7 +18,7 @@ import (
 type AuthHandler struct {
 	authService *service.AuthService
 	secure      bool // should be true in production and false in development (set in Config.SecureMode)
-	jwtSecret string
+	jwtSecret   string
 }
 
 // NewAuthHandler creates an AuthHandler object.
@@ -34,9 +34,9 @@ func NewAuthHandler(authService *service.AuthService, secure bool, jwtSecret str
 // Request Body Structures
 
 type registerRequest struct {
-	Email        string `json:"email"`
-	Name				 string `json:"name"`
-	Password     string `json:"password"`
+	Email    string `json:"email"`
+	Name     string `json:"name"`
+	Password string `json:"password"`
 }
 
 type loginRequest struct {
@@ -58,6 +58,18 @@ func isEmpty(str string) bool {
 
 // Handlers
 
+// Register creates a new user account.
+//
+//	@Summary		Register
+//	@Description	Create a new user account. Returns an access_token and sets a refresh_token cookie.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		registerRequest	true	"Registration details"
+//	@Success		200		{object}	TokenResponse
+//	@Failure		400		{object}	response.errorResponse	"invalid body or missing fields"
+//	@Failure		409		{object}	response.errorResponse	"email already registered"
+//	@Router			/auth/register [post]
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
@@ -82,6 +94,18 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, TokenResponse{AccessToken: authResult.AccessToken}, http.StatusOK)
 }
 
+// Login authenticates with email and password.
+//
+//	@Summary		Login
+//	@Description	Authenticate with email and password. Returns an access_token and sets a refresh_token cookie.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		loginRequest	true	"Login credentials"
+//	@Success		200		{object}	TokenResponse
+//	@Failure		400		{object}	response.errorResponse	"invalid body or missing fields"
+//	@Failure		401		{object}	response.errorResponse	"invalid credentials"
+//	@Router			/auth/login [post]
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
@@ -107,6 +131,16 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, TokenResponse{AccessToken: authResult.AccessToken}, http.StatusOK)
 }
 
+// Refresh rotates the refresh_token cookie and issues a new access token.
+//
+//	@Summary		Refresh
+//	@Description	Rotate the refresh_token cookie (single use) and issue a new access_token.
+//	@Tags			auth
+//	@Produce		json
+//	@Success		200	{object}	TokenResponse
+//	@Failure		400	{object}	response.errorResponse	"no refresh token cookie"
+//	@Failure		401	{object}	response.errorResponse	"invalid or expired refresh token"
+//	@Router			/auth/refresh [post]
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
@@ -127,6 +161,14 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, TokenResponse{AccessToken: authResult.AccessToken}, http.StatusOK)
 }
 
+// Logout revokes the current refresh token and clears its cookie.
+//
+//	@Summary		Logout
+//	@Description	Revoke the current refresh token (if present) and clear the refresh_token cookie. Idempotent: always returns 200.
+//	@Tags			auth
+//	@Produce		json
+//	@Success		200	{object}	SimpleResponse
+//	@Router			/auth/logout [post]
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
@@ -179,7 +221,7 @@ func (h *AuthHandler) SetupRoutes(r chi.Router) {
 	r.Route("/auth", func(r chi.Router) {
 		// rate-limit by IP (may add per-email rate-limiting via redis in the future)
 		r.Group(func(r chi.Router) {
-			r.Use(httprate.LimitByIP(10, 1*time.Minute)) 
+			r.Use(httprate.LimitByIP(10, 1*time.Minute))
 			r.Post("/register", h.Register)
 			r.Post("/login", h.Login)
 		})

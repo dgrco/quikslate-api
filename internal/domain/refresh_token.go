@@ -6,11 +6,11 @@ import (
 )
 
 type RefreshToken struct {
-	Id         string
-	UserId     string
-	Token      string
-	ExpiresAt  time.Time
-	CreatedAt  time.Time
+	Id        string
+	UserId    string
+	Token     string
+	ExpiresAt time.Time
+	CreatedAt time.Time
 }
 
 type RefreshTokenRepository interface {

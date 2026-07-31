@@ -12,6 +12,7 @@ type Config struct {
 	DatabaseUrl string
 	JWTSecret   string
 	SecureMode  string
+	CorsOrigins string
 }
 
 // Load collects a set of environment variables based on Config; panics if required variables are not set
@@ -21,7 +22,17 @@ func Load() *Config {
 		DatabaseUrl: mustGetEnv("DATABASE_URL"),
 		JWTSecret:   mustGetEnv("JWT_SECRET"),
 		SecureMode:  getEnv("SECURE_MODE", "true"),
+		CorsOrigins: getEnv("CORS_ORIGINS", "http://localhost:5173"),
 	}
+}
+
+// CorsOriginList splits the comma-separated CorsOrigins value into a slice, trimming whitespace.
+func (c *Config) CorsOriginList() []string {
+	origins := strings.Split(c.CorsOrigins, ",")
+	for i, o := range origins {
+		origins[i] = strings.TrimSpace(o)
+	}
+	return origins
 }
 
 // IsSecureMode is a safe way to extract a boolean from the SecureMode string value.

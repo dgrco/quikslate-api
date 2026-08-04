@@ -55,6 +55,17 @@ type BusinessDTO struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type BusinessMemberDetailDTO struct {
+	UserId         string    `json:"user_id"`
+	BusinessId     string    `json:"business_id"`
+	Name           string    `json:"name"`
+	Email          string    `json:"email"`
+	IsPrimaryAdmin bool      `json:"is_primary_admin"`
+	IsAdmin        bool      `json:"is_admin"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
 // Handlers
 
 // CreateBusiness creates a new business owned by the caller, who becomes its primary admin.
@@ -145,6 +156,42 @@ func (h *BusinessHandler) GetBusiness(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: b.CreatedAt,
 		UpdatedAt: b.UpdatedAt,
 	}, http.StatusOK)
+}
+
+// GetBusinessMemberDetails returns the business members and their details by businessId.
+//
+//	@Summary		Get business member details
+//	@Description	Get business member details by business ID
+//	@Tags				businesses
+//	@Security		BearerAuth
+//	@Produce		json
+//	@Param			businessId	path		string	true	"Business ID"
+//	@Success		200			{array}	[]BusinessMemberDetailDTO
+//	@Failure		401			{object}	response.errorResponse
+//	@Router			/businesses/{businessId}/members [get]
+func (h *BusinessHandler) GetBusinessMemberDetails(w http.ResponseWriter, r *http.Request) {
+	bmds, err := h.businessService.GetBusinessMemberDetailsByBusinessId(r.Context())
+	if err != nil {
+		handleServiceError(w, err, "get business member details")
+		return
+	}
+
+	bmdDTOS := []BusinessMemberDetailDTO{}
+	for _, bmd := range bmds {
+		bmdDTO := BusinessMemberDetailDTO{
+			UserId:         bmd.UserId,
+			BusinessId:     bmd.BusinessId,
+			Name:           bmd.Name,
+			Email:          bmd.Email,
+			IsPrimaryAdmin: bmd.IsPrimaryAdmin,
+			IsAdmin:        bmd.IsAdmin,
+			CreatedAt:      bmd.CreatedAt,
+			UpdatedAt:      bmd.UpdatedAt,
+		}
+		bmdDTOS = append(bmdDTOS, bmdDTO)
+	}
+
+	response.WriteJSON(w, bmdDTOS, http.StatusOK)
 }
 
 // RenameBusiness updates the business's name.
@@ -275,8 +322,12 @@ func (h *BusinessHandler) SetupRoutes(r chi.Router) {
 			r.Get("/", h.GetBusiness)
 			r.Patch("/", h.RenameBusiness)
 			r.Delete("/", h.DeleteBusiness)
-			r.Delete("/members/{userId}", h.RemoveUserFromBusiness)
-			r.Patch("/members/{userId}/admin", h.SetAdminForBusinessMember)
+
+			r.Route("/members", func(r chi.Router) {
+				r.Get("/", h.GetBusinessMemberDetails)
+				r.Delete("/{userId}", h.RemoveUserFromBusiness)
+				r.Patch("/{userId}/admin", h.SetAdminForBusinessMember)
+			})
 		})
 	})
 }

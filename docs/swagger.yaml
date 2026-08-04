@@ -123,6 +123,25 @@ definitions:
       updated_at:
         type: string
     type: object
+  internal_handler.BusinessMemberDetailDTO:
+    properties:
+      business_id:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      is_admin:
+        type: boolean
+      is_primary_admin:
+        type: boolean
+      name:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
   internal_handler.CreateBusinessResponse:
     properties:
       business_id:
@@ -1280,6 +1299,35 @@ paths:
       summary: Unassign shift
       tags:
       - shifts
+  /businesses/{businessId}/members:
+    get:
+      description: Get business member details by business ID
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              items:
+                $ref: '#/definitions/internal_handler.BusinessMemberDetailDTO'
+              type: array
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get business member details
+      tags:
+      - businesses
   /businesses/{businessId}/members/{userId}:
     delete:
       description: Remove a user from the business (and all of their location roles/position

@@ -25,9 +25,10 @@ func ValidateLocationName(locationName string) error {
 	return nil
 }
 
-// Update struct (can be used for partial updates -> simply don't assign a field)
+// LocationUpdate is a full replacement of a location's mutable fields —
+// there is no partial-update path, so both fields are always applied as given.
 type LocationUpdate struct {
-	Name    *string
+	Name    string
 	Address *string
 }
 

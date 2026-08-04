@@ -66,7 +66,7 @@ func (ls *LocationService) GetAllLocations(
 	return locations, nil
 }
 
-// Update a Location with locationId with a partial update object
+// Update a Location with locationId, replacing its name and address
 // (Authorization: admin)
 func (ls *LocationService) UpdateLocation(
 	ctx context.Context,
@@ -76,10 +76,8 @@ func (ls *LocationService) UpdateLocation(
 	if err := validateIsAdmin(ctx); err != nil {
 		return fmt.Errorf("failed to update location: %w", err)
 	}
-	if update.Name != nil {
-		if err := domain.ValidateLocationName(*update.Name); err != nil {
-			return fmt.Errorf("failed to update location: %w", err)
-		}
+	if err := domain.ValidateLocationName(update.Name); err != nil {
+		return fmt.Errorf("failed to update location: %w", err)
 	}
 
 	_, err := getAndValidateLocation(ctx, ls.repo, locationId)

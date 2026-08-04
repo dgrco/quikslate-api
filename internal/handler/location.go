@@ -36,7 +36,7 @@ type createLocationRequest struct {
 }
 
 type updateLocationRequest struct {
-	Name    *string `json:"name"`
+	Name    string  `json:"name"`
 	Address *string `json:"address"`
 }
 
@@ -133,22 +133,22 @@ func (h *LocationHandler) GetAllLocations(w http.ResponseWriter, r *http.Request
 	response.WriteJSON(w, MultipleLocationResponse{Locations: ls}, http.StatusOK)
 }
 
-// UpdateLocation partially updates the location identified by locationId.
+// UpdateLocation fully replaces the name and address of the location identified by locationId.
 //
 //	@Summary		Update location
-//	@Description	Partially update a location's name and/or address. Admin only.
+//	@Description	Replace a location's name and address. Admin only.
 //	@Tags			locations
 //	@Security		BearerAuth
 //	@Accept			json
 //	@Produce		json
 //	@Param			businessId	path		string					true	"Business ID"
 //	@Param			locationId	path		string					true	"Location ID"
-//	@Param			body		body		updateLocationRequest	true	"Fields to update"
+//	@Param			body		body		updateLocationRequest	true	"New location fields"
 //	@Success		200			{object}	SimpleResponse
 //	@Failure		400			{object}	response.errorResponse
 //	@Failure		401			{object}	response.errorResponse
 //	@Failure		403			{object}	response.errorResponse
-//	@Router			/businesses/{businessId}/locations/{locationId} [patch]
+//	@Router			/businesses/{businessId}/locations/{locationId} [put]
 func (h *LocationHandler) UpdateLocation(w http.ResponseWriter, r *http.Request) {
 	locationId := chi.URLParam(r, "locationId")
 
@@ -168,7 +168,7 @@ func (h *LocationHandler) UpdateLocation(w http.ResponseWriter, r *http.Request)
 			Address: req.Address,
 		},
 	); err != nil {
-		handleServiceError(w, err, "get location")
+		handleServiceError(w, err, "update location")
 		return
 	}
 
@@ -211,7 +211,7 @@ func (h *LocationHandler) SetupRoutes(r chi.Router) {
 		r.Route("/{locationId}", func(r chi.Router) {
 			r.Use(RequireLocationMember(h.authService, h.jwtSecret))
 			r.Get("/", h.GetLocation)
-			r.Patch("/", h.UpdateLocation)
+			r.Put("/", h.UpdateLocation)
 			r.Delete("/", h.DeleteLocation)
 		})
 	})

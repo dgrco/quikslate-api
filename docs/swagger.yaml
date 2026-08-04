@@ -887,10 +887,10 @@ paths:
       summary: Get location
       tags:
       - locations
-    patch:
+    put:
       consumes:
       - application/json
-      description: Partially update a location's name and/or address. Admin only.
+      description: Replace a location's name and address. Admin only.
       parameters:
       - description: Business ID
         in: path
@@ -902,7 +902,7 @@ paths:
         name: locationId
         required: true
         type: string
-      - description: Fields to update
+      - description: New location fields
         in: body
         name: body
         required: true

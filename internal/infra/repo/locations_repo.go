@@ -24,6 +24,12 @@ const (
 		SELECT id, business_id, name, address, created_at, updated_at
 		FROM locations
 		WHERE business_id = $1
+		ORDER BY created_at
+	`
+	updateLocationQuery = `
+		UPDATE locations
+		SET name = $1, address = $2, updated_at = NOW()
+		WHERE id = $3
 	`
 	deleteLocationQuery = `
 		DELETE FROM locations
@@ -104,21 +110,7 @@ func (r *PgRepository) GetLocationsByBusinessId(ctx context.Context, businessId 
 }
 
 func (r *PgRepository) UpdateLocationById(ctx context.Context, id string, update domain.LocationUpdate) error {
-	builder := newUpdateBuilder()
-
-	if update.Name != nil {
-		builder.Add("name", *update.Name)
-	}
-	if update.Address != nil {
-		builder.Add("address", *update.Address)
-	}
-	if builder.IsEmpty() {
-		return nil // nothing changed
-	}
-
-	query, args := builder.Build("locations", "id", id)
-
-	cmdTag, err := r.exec.Exec(ctx, query, args...)
+	cmdTag, err := r.exec.Exec(ctx, updateLocationQuery, update.Name, update.Address, id)
 	if err != nil {
 		return fmt.Errorf("failed to update location: %w", err)
 	}

@@ -14,6 +14,9 @@ type AccessTokenClaims struct {
 	jwt.RegisteredClaims
 }
 
+// GenerateAccessToken signs a short-lived (15 min) JWT carrying only userId —
+// no roles or admin flags, since those are looked up fresh from the database
+// on every request instead of trusted from the token (see api/CLAUDE.md).
 func GenerateAccessToken(userId, secret string) (string, error) {
 	claims := AccessTokenClaims{
 		UserId: userId,
@@ -33,6 +36,9 @@ func GenerateAccessToken(userId, secret string) (string, error) {
 	return signed, nil
 }
 
+// ValidateAccessToken parses and verifies tokenString's signature (rejecting
+// anything not signed with HMAC, regardless of what alg it claims) and
+// expiry, returning its claims if valid.
 func ValidateAccessToken(tokenString, secret string) (*AccessTokenClaims, error) {
 	token, err := jwt.ParseWithClaims(
 		tokenString,

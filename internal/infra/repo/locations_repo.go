@@ -37,6 +37,8 @@ const (
 	`
 )
 
+// scanLocationFields scans a row's locations columns into l using scan
+// (either row.Scan or rows.Scan).
 func scanLocationFields(l *domain.Location, scan func(...any) error) error {
 	return scan(
 		&l.Id,
@@ -48,6 +50,7 @@ func scanLocationFields(l *domain.Location, scan func(...any) error) error {
 	)
 }
 
+// scanLocation scans a single row into a domain.Location.
 func scanLocation(row pgx.Row) (domain.Location, error) {
 	var l domain.Location
 	err := scanLocationFields(&l, row.Scan)
@@ -57,6 +60,7 @@ func scanLocation(row pgx.Row) (domain.Location, error) {
 	return l, nil
 }
 
+// scanLocations scans every remaining row into a slice of domain.Location.
 func scanLocations(rows pgx.Rows) ([]domain.Location, error) {
 	locations := []domain.Location{}
 	for rows.Next() {
@@ -73,6 +77,7 @@ func scanLocations(rows pgx.Rows) ([]domain.Location, error) {
 	return locations, nil
 }
 
+// CreateLocation inserts a new location under businessId and returns it.
 func (r *PgRepository) CreateLocation(ctx context.Context, businessId, name string, address *string) (domain.Location, error) {
 	l, err := scanLocation(r.exec.QueryRow(ctx, createLocationQuery, businessId, name, address))
 	if err != nil {
@@ -81,6 +86,10 @@ func (r *PgRepository) CreateLocation(ctx context.Context, businessId, name stri
 	return l, nil
 }
 
+// GetLocationById fetches a location by id, returning domain.ErrNotFound if
+// no such location exists. Callers that need to enforce it belongs to a
+// particular business must check the returned BusinessId themselves — this
+// does no business-scoping on its own.
 func (r *PgRepository) GetLocationById(ctx context.Context, id string) (domain.Location, error) {
 	l, err := scanLocation(r.exec.QueryRow(ctx, getLocationByIdQuery, id))
 	if err != nil {
@@ -94,6 +103,8 @@ func (r *PgRepository) GetLocationById(ctx context.Context, id string) (domain.L
 	return l, nil
 }
 
+// GetLocationsByBusinessId returns every location under businessId,
+// oldest-created first.
 func (r *PgRepository) GetLocationsByBusinessId(ctx context.Context, businessId string) ([]domain.Location, error) {
 	rows, err := r.exec.Query(ctx, getLocationsByBusinessIdQuery, businessId)
 	if err != nil {
@@ -109,6 +120,8 @@ func (r *PgRepository) GetLocationsByBusinessId(ctx context.Context, businessId 
 	return locations, nil
 }
 
+// UpdateLocationById overwrites a location's name and address, returning
+// domain.ErrNotFound if id doesn't match any row.
 func (r *PgRepository) UpdateLocationById(ctx context.Context, id string, update domain.LocationUpdate) error {
 	cmdTag, err := r.exec.Exec(ctx, updateLocationQuery, update.Name, update.Address, id)
 	if err != nil {
@@ -121,6 +134,9 @@ func (r *PgRepository) UpdateLocationById(ctx context.Context, id string, update
 	return nil
 }
 
+// DeleteLocation deletes a location by id, returning domain.ErrNotFound if
+// id doesn't match any row. Positions, shifts, location_roles, etc. cascade
+// via FK ON DELETE CASCADE.
 func (r *PgRepository) DeleteLocation(ctx context.Context, id string) error {
 	cmdTag, err := r.exec.Exec(ctx, deleteLocationQuery, id)
 	if err != nil {

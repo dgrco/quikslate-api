@@ -1033,6 +1033,201 @@ const docTemplate = `{
                 }
             }
         },
+        "/businesses/{businessId}/locations/{locationId}/roles": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "List every business member with a role at a location. Admin, LocationLead, or Manager.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "location-roles"
+                ],
+                "summary": "List location roles",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Business ID",
+                        "name": "businessId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Location ID",
+                        "name": "locationId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler.MultipleLocationRoleResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/businesses/{businessId}/locations/{locationId}/roles/{userId}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Assign or change a business member's role at a location. Admin, LocationLead, or Manager (within the role hierarchy).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "location-roles"
+                ],
+                "summary": "Assign location role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Business ID",
+                        "name": "businessId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Location ID",
+                        "name": "locationId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Target user ID",
+                        "name": "userId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Role to assign",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler.assignLocationRoleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler.SimpleResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Remove a business member's role at a location. Admin, LocationLead, or Manager (within the role hierarchy).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "location-roles"
+                ],
+                "summary": "Remove location role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Business ID",
+                        "name": "businessId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Location ID",
+                        "name": "locationId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Target user ID",
+                        "name": "userId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler.SimpleResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/businesses/{businessId}/locations/{locationId}/shifts": {
             "get": {
                 "security": [
@@ -2041,10 +2236,11 @@ const docTemplate = `{
                 "employee",
                 "manager",
                 "location_lead",
-                ""
+                "",
+                "admin"
             ],
             "x-enum-comments": {
-                "EmptyRole": "for admins/identity-only",
+                "EmptyRole": "no location-scoped role (identity-only sessions)",
                 "LocationLead": "manages (leads) all roles at a location",
                 "Manager": "manages employees"
             },
@@ -2052,13 +2248,15 @@ const docTemplate = `{
                 "",
                 "manages employees",
                 "manages (leads) all roles at a location",
-                "for admins/identity-only"
+                "no location-scoped role (identity-only sessions)",
+                ""
             ],
             "x-enum-varnames": [
                 "Employee",
                 "Manager",
                 "LocationLead",
-                "EmptyRole"
+                "EmptyRole",
+                "Admin"
             ]
         },
         "github_com_dgrco_quikslate_internal_domain.Location": {
@@ -2248,6 +2446,35 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_handler.LocationRoleDetailDTO": {
+            "type": "object",
+            "properties": {
+                "business_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "location_id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "role": {
+                    "$ref": "#/definitions/github_com_dgrco_quikslate_internal_domain.LRole"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
         "internal_handler.MultipleEmployeePositionResponse": {
             "type": "object",
             "properties": {
@@ -2266,6 +2493,17 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/github_com_dgrco_quikslate_internal_domain.Location"
+                    }
+                }
+            }
+        },
+        "internal_handler.MultipleLocationRoleResponse": {
+            "type": "object",
+            "properties": {
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_handler.LocationRoleDetailDTO"
                     }
                 }
             }
@@ -2337,6 +2575,14 @@ const docTemplate = `{
             "properties": {
                 "position_id": {
                     "type": "string"
+                }
+            }
+        },
+        "internal_handler.assignLocationRoleRequest": {
+            "type": "object",
+            "properties": {
+                "role": {
+                    "$ref": "#/definitions/github_com_dgrco_quikslate_internal_domain.LRole"
                 }
             }
         },

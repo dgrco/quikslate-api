@@ -37,6 +37,8 @@ const (
 	`
 )
 
+// scanPositionFields scans a row's positions columns into p using scan
+// (either row.Scan or rows.Scan).
 func scanPositionFields(p *domain.Position, scan func(...any) error) error {
 	return scan(
 		&p.Id,
@@ -47,6 +49,7 @@ func scanPositionFields(p *domain.Position, scan func(...any) error) error {
 	)
 }
 
+// scanPosition scans a single row into a domain.Position.
 func scanPosition(row pgx.Row) (domain.Position, error) {
 	var p domain.Position
 	err := scanPositionFields(&p, row.Scan)
@@ -56,6 +59,7 @@ func scanPosition(row pgx.Row) (domain.Position, error) {
 	return p, nil
 }
 
+// scanPositions scans every remaining row into a slice of domain.Position.
 func scanPositions(rows pgx.Rows) ([]domain.Position, error) {
 	positions := []domain.Position{}
 	for rows.Next() {
@@ -72,6 +76,9 @@ func scanPositions(rows pgx.Rows) ([]domain.Position, error) {
 	return positions, nil
 }
 
+// CreatePosition inserts a new position under businessId, returning
+// domain.ErrAlreadyExists if that business already has a position with this
+// name.
 func (r *PgRepository) CreatePosition(ctx context.Context, businessId, name string) (domain.Position, error) {
 	p, err := scanPosition(r.exec.QueryRow(ctx, createPositionQuery, businessId, name))
 	if err != nil {
@@ -83,6 +90,10 @@ func (r *PgRepository) CreatePosition(ctx context.Context, businessId, name stri
 	return p, nil
 }
 
+// GetPositionById fetches a position by id, returning domain.ErrNotFound if
+// no such position exists. Callers that need to enforce it belongs to a
+// particular business must check the returned BusinessId themselves — this
+// does no business-scoping on its own.
 func (r *PgRepository) GetPositionById(ctx context.Context, id string) (domain.Position, error) {
 	p, err := scanPosition(r.exec.QueryRow(ctx, getPositionByIdQuery, id))
 	if err != nil {
@@ -96,6 +107,7 @@ func (r *PgRepository) GetPositionById(ctx context.Context, id string) (domain.P
 	return p, nil
 }
 
+// GetPositionsByBusinessId returns every position under businessId.
 func (r *PgRepository) GetPositionsByBusinessId(ctx context.Context, businessId string) ([]domain.Position, error) {
 	rows, err := r.exec.Query(ctx, getPositionsByBusinessIdQuery, businessId)
 	if err != nil {
@@ -110,6 +122,9 @@ func (r *PgRepository) GetPositionsByBusinessId(ctx context.Context, businessId 
 	return positions, nil
 }
 
+// ChangePositionName renames a position, returning domain.ErrNotFound if id
+// doesn't match any row, or domain.ErrAlreadyExists if the new name collides
+// with another position in the same business.
 func (r *PgRepository) ChangePositionName(ctx context.Context, id, name string) error {
 	cmdTag, err := r.exec.Exec(ctx, changePositionNameQuery, name, id)
 	if err != nil {
@@ -124,6 +139,8 @@ func (r *PgRepository) ChangePositionName(ctx context.Context, id, name string) 
 	return nil
 }
 
+// DeletePosition deletes a position by id, returning domain.ErrNotFound if
+// id doesn't match any row.
 func (r *PgRepository) DeletePosition(ctx context.Context, id string) error {
 	cmdTag, err := r.exec.Exec(ctx, deletePositionQuery, id)
 	if err != nil {

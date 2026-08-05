@@ -14,6 +14,8 @@ type Position struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
+// ValidatePositionName returns an error if positionName is empty or
+// all-whitespace.
 func ValidatePositionName(positionName string) error {
 	if strings.TrimSpace(positionName) == "" {
 		return NewValidationError("position name cannot be empty")

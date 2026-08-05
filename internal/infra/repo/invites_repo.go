@@ -34,6 +34,8 @@ const (
 	`
 )
 
+// scanInviteFields scans a row's invites columns into inv using scan (either
+// row.Scan or rows.Scan).
 func scanInviteFields(inv *domain.Invite, scan func(...any) error) error {
 	if err := scan(
 		&inv.Id,
@@ -52,6 +54,7 @@ func scanInviteFields(inv *domain.Invite, scan func(...any) error) error {
 	return nil
 }
 
+// scanInvite scans a single row into a domain.Invite.
 func scanInvite(row pgx.Row) (domain.Invite, error) {
 	var inv domain.Invite
 	if err := scanInviteFields(&inv, row.Scan); err != nil {
@@ -60,6 +63,10 @@ func scanInvite(row pgx.Row) (domain.Invite, error) {
 	return inv, nil
 }
 
+// CreateInvite inserts a new invite for email to join businessId at
+// locationId with role, hashed under tokenHash. Returns domain.ErrAlreadyExists
+// if a unique-constraint violation occurs (e.g. a pending invite for this
+// email/business already exists).
 func (r *PgRepository) CreateInvite(
 	ctx context.Context,
 	tokenHash,
@@ -79,6 +86,8 @@ func (r *PgRepository) CreateInvite(
 	return inv, nil
 }
 
+// GetInviteByTokenHash looks up an invite by the hash of its raw token,
+// returning domain.ErrNotFound if no invite matches.
 func (r *PgRepository) GetInviteByTokenHash(ctx context.Context, tokenHash string) (domain.Invite, error) {
 	inv, err := scanInvite(r.exec.QueryRow(ctx, getInviteFromTokenHashQuery, tokenHash))
 	if err != nil {
@@ -117,6 +126,8 @@ func (r *PgRepository) GetPendingInviteByEmailAndBusinessId(
 	return inv, nil
 }
 
+// MarkInviteAccepted stamps accepted_at on the invite matching tokenHash,
+// returning domain.ErrNotFound if no invite matches.
 func (r *PgRepository) MarkInviteAccepted(ctx context.Context, tokenHash string) error {
 	cmdTag, err := r.exec.Exec(ctx, markInviteAcceptedQuery, tokenHash)
 	if err != nil {

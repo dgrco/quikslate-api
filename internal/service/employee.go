@@ -12,6 +12,7 @@ type EmployeeService struct {
 	repo domain.Repo
 }
 
+// NewEmployeeService constructs an EmployeeService backed by repo.
 func NewEmployeeService(repo domain.Repo) *EmployeeService {
 	return &EmployeeService{
 		repo,

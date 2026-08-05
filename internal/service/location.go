@@ -12,6 +12,7 @@ type LocationService struct {
 	repo domain.Repo
 }
 
+// NewLocationService constructs a LocationService backed by repo.
 func NewLocationService(repo domain.Repo) *LocationService {
 	return &LocationService{
 		repo,
@@ -80,11 +81,6 @@ func (ls *LocationService) UpdateLocation(
 		return fmt.Errorf("failed to update location: %w", err)
 	}
 
-	_, err := getAndValidateLocation(ctx, ls.repo, locationId)
-	if err != nil {
-		return fmt.Errorf("failed to update location: %w", err)
-	}
-
 	if err := ls.repo.UpdateLocationById(ctx, locationId, update); err != nil {
 		return fmt.Errorf("failed to update location: %w", err)
 	}
@@ -98,11 +94,6 @@ func (ls *LocationService) DeleteLocation(
 	locationId string,
 ) error {
 	if err := validateIsAdmin(ctx); err != nil {
-		return fmt.Errorf("failed to delete location: %w", err)
-	}
-
-	_, err := getAndValidateLocation(ctx, ls.repo, locationId)
-	if err != nil {
 		return fmt.Errorf("failed to delete location: %w", err)
 	}
 

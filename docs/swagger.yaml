@@ -13,21 +13,24 @@ definitions:
     - manager
     - location_lead
     - ""
+    - admin
     type: string
     x-enum-comments:
-      EmptyRole: for admins/identity-only
+      EmptyRole: no location-scoped role (identity-only sessions)
       LocationLead: manages (leads) all roles at a location
       Manager: manages employees
     x-enum-descriptions:
     - ""
     - manages employees
     - manages (leads) all roles at a location
-    - for admins/identity-only
+    - no location-scoped role (identity-only sessions)
+    - ""
     x-enum-varnames:
     - Employee
     - Manager
     - LocationLead
     - EmptyRole
+    - Admin
   github_com_dgrco_quikslate_internal_domain.Location:
     properties:
       address:
@@ -152,6 +155,25 @@ definitions:
       invite_token:
         type: string
     type: object
+  internal_handler.LocationRoleDetailDTO:
+    properties:
+      business_id:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      location_id:
+        type: string
+      name:
+        type: string
+      role:
+        $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.LRole'
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
   internal_handler.MultipleEmployeePositionResponse:
     properties:
       positions:
@@ -164,6 +186,13 @@ definitions:
       locations:
         items:
           $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.Location'
+        type: array
+    type: object
+  internal_handler.MultipleLocationRoleResponse:
+    properties:
+      roles:
+        items:
+          $ref: '#/definitions/internal_handler.LocationRoleDetailDTO'
         type: array
     type: object
   internal_handler.MultiplePositionResponse:
@@ -209,6 +238,11 @@ definitions:
     properties:
       position_id:
         type: string
+    type: object
+  internal_handler.assignLocationRoleRequest:
+    properties:
+      role:
+        $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.LRole'
     type: object
   internal_handler.assignShiftRequest:
     properties:
@@ -951,6 +985,136 @@ paths:
       summary: Update location
       tags:
       - locations
+  /businesses/{businessId}/locations/{locationId}/roles:
+    get:
+      description: List every business member with a role at a location. Admin, LocationLead,
+        or Manager.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.MultipleLocationRoleResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: List location roles
+      tags:
+      - location-roles
+  /businesses/{businessId}/locations/{locationId}/roles/{userId}:
+    delete:
+      description: Remove a business member's role at a location. Admin, LocationLead,
+        or Manager (within the role hierarchy).
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      - description: Target user ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove location role
+      tags:
+      - location-roles
+    put:
+      consumes:
+      - application/json
+      description: Assign or change a business member's role at a location. Admin,
+        LocationLead, or Manager (within the role hierarchy).
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      - description: Target user ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      - description: Role to assign
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.assignLocationRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Assign location role
+      tags:
+      - location-roles
   /businesses/{businessId}/locations/{locationId}/shifts:
     get:
       description: List all shifts at a location. Any member of the location (Admin,

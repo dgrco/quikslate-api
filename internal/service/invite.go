@@ -15,6 +15,7 @@ type InviteService struct {
 	repo domain.Repo
 }
 
+// NewInviteService constructs an InviteService backed by repo.
 func NewInviteService(repo domain.Repo) *InviteService {
 	return &InviteService{
 		repo,
@@ -53,7 +54,7 @@ func (s *InviteService) CreateInvite(
 		return InviteResult{}, fmt.Errorf("failed to create invite: %w", domain.ErrForbidden)
 	}
 
-	callerRole := domain.EmptyRole
+	callerRole := domain.Admin
 	if !ctxkeys.GetIsAdmin(ctx) {
 		lr, err := s.repo.GetLocationRole(ctx, ctxkeys.GetUserId(ctx), locationId, businessId)
 		if err != nil || lr.Role != domain.LocationLead {

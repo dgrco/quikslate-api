@@ -12,6 +12,7 @@ type BusinessService struct {
 	repo domain.Repo
 }
 
+// NewBusinessService constructs a BusinessService backed by repo.
 func NewBusinessService(repo domain.Repo) *BusinessService {
 	return &BusinessService{
 		repo,

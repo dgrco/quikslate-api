@@ -47,6 +47,8 @@ const (
 	`
 )
 
+// scanShiftFields scans a row's shifts columns into s using scan (either
+// row.Scan or rows.Scan).
 func scanShiftFields(s *domain.Shift, scan func(...any) error) error {
 	return scan(
 		&s.Id,
@@ -61,6 +63,7 @@ func scanShiftFields(s *domain.Shift, scan func(...any) error) error {
 	)
 }
 
+// scanShift scans a single row into a domain.Shift.
 func scanShift(row pgx.Row) (domain.Shift, error) {
 	var s domain.Shift
 	err := scanShiftFields(&s, row.Scan)
@@ -70,6 +73,7 @@ func scanShift(row pgx.Row) (domain.Shift, error) {
 	return s, nil
 }
 
+// scanShifts scans every remaining row into a slice of domain.Shift.
 func scanShifts(rows pgx.Rows) ([]domain.Shift, error) {
 	shifts := []domain.Shift{}
 	for rows.Next() {
@@ -86,6 +90,8 @@ func scanShifts(rows pgx.Rows) ([]domain.Shift, error) {
 	return shifts, nil
 }
 
+// CreateShift inserts a new shift at locationId for positionId, optionally
+// pre-assigned to userId, and returns it.
 func (r *PgRepository) CreateShift(
 	ctx context.Context,
 	userId *string,
@@ -100,6 +106,8 @@ func (r *PgRepository) CreateShift(
 	return s, nil
 }
 
+// GetShiftById fetches a shift by id, returning domain.ErrNotFound if no
+// such shift exists.
 func (r *PgRepository) GetShiftById(ctx context.Context, id string) (domain.Shift, error) {
 	s, err := scanShift(r.exec.QueryRow(ctx, getShiftByIdQuery, id))
 	if err != nil {
@@ -113,6 +121,8 @@ func (r *PgRepository) GetShiftById(ctx context.Context, id string) (domain.Shif
 	return s, nil
 }
 
+// GetShiftsByLocationId returns every shift (any status, assigned or not) at
+// locationId.
 func (r *PgRepository) GetShiftsByLocationId(ctx context.Context, locationId string) ([]domain.Shift, error) {
 	rows, err := r.exec.Query(ctx, getShiftsByLocationIdQuery, locationId)
 	if err != nil {
@@ -128,6 +138,9 @@ func (r *PgRepository) GetShiftsByLocationId(ctx context.Context, locationId str
 	return shifts, nil
 }
 
+// UpdateShiftById partially updates a shift's status/start/end time — only
+// the non-nil fields of update are written. A no-op (returns nil without
+// querying) if update has no fields set at all.
 func (r *PgRepository) UpdateShiftById(ctx context.Context, id string, update domain.ShiftUpdate) error {
 	builder := newUpdateBuilder()
 	if update.Status != nil {
@@ -154,6 +167,8 @@ func (r *PgRepository) UpdateShiftById(ctx context.Context, id string, update do
 	return nil
 }
 
+// AssignShift assigns userId to shift id and sets its status to "assigned",
+// returning domain.ErrNotFound if id doesn't match any row.
 func (r *PgRepository) AssignShift(ctx context.Context, id, userId string) error {
 	cmdTags, err := r.exec.Exec(ctx, assignShiftQuery, userId, id)
 	if err != nil {
@@ -165,6 +180,8 @@ func (r *PgRepository) AssignShift(ctx context.Context, id, userId string) error
 	return nil
 }
 
+// UnassignShift clears a shift's assigned user and sets its status to
+// "uncovered", returning domain.ErrNotFound if id doesn't match any row.
 func (r *PgRepository) UnassignShift(ctx context.Context, id string) error {
 	cmdTag, err := r.exec.Exec(ctx, unassignShiftQuery, id)
 	if err != nil {
@@ -176,7 +193,9 @@ func (r *PgRepository) UnassignShift(ctx context.Context, id string) error {
 	return nil
 }
 
-// Soft-delete a shift (use this over DeleteShift most of the time)
+// CancelShift soft-deletes a shift by setting its status to "cancelled"
+// (use this over DeleteShift most of the time), returning domain.ErrNotFound
+// if id doesn't match any row.
 func (r *PgRepository) CancelShift(ctx context.Context, id string) error {
 	cmdTag, err := r.exec.Exec(ctx, cancelShiftQuery, id)
 	if err != nil {
@@ -188,7 +207,9 @@ func (r *PgRepository) CancelShift(ctx context.Context, id string) error {
 	return nil
 }
 
-// Hard-delete a shift (should only be used for admin purposes)
+// DeleteShift permanently deletes a shift row (should only be used for admin
+// purposes — CancelShift is the normal way to remove a shift), returning
+// domain.ErrNotFound if id doesn't match any row.
 func (r *PgRepository) DeleteShift(ctx context.Context, id string) error {
 	cmdTag, err := r.exec.Exec(ctx, deleteShiftQuery, id)
 	if err != nil {

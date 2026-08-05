@@ -21,6 +21,8 @@ type PgRepository struct {
 	exec queryExecutor // used at every repo call (transaction and non-transaction)
 }
 
+// NewPgRepository constructs a PgRepository that executes directly against
+// pool (i.e. outside of any transaction).
 func NewPgRepository(pool *pgxpool.Pool) *PgRepository {
 	return &PgRepository{pool, pool}
 }
@@ -32,10 +34,16 @@ func (r *PgRepository) beginPgxTx(ctx context.Context) (pgx.Tx, error) {
 	return r.pool.Begin(ctx)
 }
 
+// BeginTransaction starts a new pgx transaction, returned as a domain.Tx so
+// callers in service don't need to import pgx directly.
 func (r *PgRepository) BeginTransaction(ctx context.Context) (domain.Tx, error) {
 	return r.beginPgxTx(ctx)
 }
 
+// WithTx returns a PgRepository whose calls all run inside tx instead of
+// against the pool directly. tx must have originated from this repo's own
+// BeginTransaction — it panics otherwise, since that indicates a
+// programming error rather than a recoverable runtime condition.
 func (r *PgRepository) WithTx(tx domain.Tx) domain.Repo {
 	// We can do interface-to-interface conversion!
 	// This checks if the underlying value also implements pgx.Tx (which it should)

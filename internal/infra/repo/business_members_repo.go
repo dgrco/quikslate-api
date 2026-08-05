@@ -45,6 +45,8 @@ const (
 	`
 )
 
+// scanBusinessMemberFields scans a row's business_members columns into bm
+// using scan (either row.Scan or rows.Scan).
 func scanBusinessMemberFields(bm *domain.BusinessMember, scan func(...any) error) error {
 	return scan(
 		&bm.UserId,
@@ -56,6 +58,8 @@ func scanBusinessMemberFields(bm *domain.BusinessMember, scan func(...any) error
 	)
 }
 
+// scanBusinessMemberDetailFields scans a row's business-member-plus-user
+// columns (the join with users) into bmd using scan.
 func scanBusinessMemberDetailFields(bmd *domain.BusinessMemberDetail, scan func(...any) error) error {
 	return scan(
 		&bmd.UserId,
@@ -69,6 +73,7 @@ func scanBusinessMemberDetailFields(bmd *domain.BusinessMemberDetail, scan func(
 	)
 }
 
+// scanBusinessMember scans a single row into a domain.BusinessMember.
 func scanBusinessMember(row pgx.Row) (domain.BusinessMember, error) {
 	var bm domain.BusinessMember
 	if err := scanBusinessMemberFields(&bm, row.Scan); err != nil {
@@ -77,6 +82,8 @@ return domain.BusinessMember{}, err
 	return bm, nil
 }
 
+// scanBusinessMemberDetails scans every remaining row into a slice of
+// domain.BusinessMemberDetail.
 func scanBusinessMemberDetails(rows pgx.Rows) ([]domain.BusinessMemberDetail, error) {
 	bmds := []domain.BusinessMemberDetail{}
 	for rows.Next() {
@@ -93,6 +100,9 @@ func scanBusinessMemberDetails(rows pgx.Rows) ([]domain.BusinessMemberDetail, er
 	return bmds, nil
 }
 
+// AddUserToBusiness inserts a business_members row for userId at businessId.
+// Returns domain.ErrAlreadyExists (instead of a raw unique-constraint error)
+// if userId is already a member of businessId.
 func (r *PgRepository) AddUserToBusiness(
 	ctx context.Context,
 	userId,
@@ -110,6 +120,8 @@ func (r *PgRepository) AddUserToBusiness(
 	return nil
 }
 
+// GetBusinessMember fetches userId's membership row for businessId,
+// returning domain.ErrNotFound if they aren't a member.
 func (r *PgRepository) GetBusinessMember(ctx context.Context, userId, businessId string) (domain.BusinessMember, error) {
 	bm, err := scanBusinessMember(r.exec.QueryRow(ctx, getBusinessMemberQuery, userId, businessId))
 	if err != nil {
@@ -123,6 +135,8 @@ func (r *PgRepository) GetBusinessMember(ctx context.Context, userId, businessId
 	return bm, nil
 }
 
+// GetBusinessMemberDetailsByBusinessId returns every member of businessId,
+// each joined with their user record (name, email).
 func (r *PgRepository) GetBusinessMemberDetailsByBusinessId(ctx context.Context, businessId string) ([]domain.BusinessMemberDetail, error) {
 	rows, err := r.exec.Query(ctx, getBusinessMemberDetailsByBusinessId, businessId)
 	if err != nil {
@@ -138,6 +152,8 @@ func (r *PgRepository) GetBusinessMemberDetailsByBusinessId(ctx context.Context,
 	return bmds, nil
 }
 
+// SetAdminForBusinessMember flips a member's is_admin flag, returning
+// domain.ErrNotFound if userId isn't a member of businessId.
 func (r *PgRepository) SetAdminForBusinessMember(ctx context.Context, userId, businessId string, admin bool) error {
 	cmdTags, err := r.exec.Exec(ctx, setAdminForBusinessMemberQuery, userId, businessId, admin)
 	if err != nil {
@@ -149,6 +165,10 @@ func (r *PgRepository) SetAdminForBusinessMember(ctx context.Context, userId, bu
 	return nil
 }
 
+// GetAdminCount counts businessId's admins. The underlying query locks the
+// matching rows with FOR UPDATE, so callers running this inside a
+// transaction (e.g. before demoting the last remaining admin) can safely act
+// on the count without a concurrent demotion racing them.
 func (r *PgRepository) GetAdminCount(ctx context.Context, businessId string) (int, error) {
 	var nAdmins int
 	if err := r.exec.QueryRow(ctx, getAdminCountQuery, businessId).Scan(&nAdmins); err != nil {
@@ -157,6 +177,8 @@ func (r *PgRepository) GetAdminCount(ctx context.Context, businessId string) (in
 	return nAdmins, nil
 }
 
+// RemoveUserFromBusiness deletes a member's business_members row, returning
+// domain.ErrNotFound if userId isn't a member of businessId.
 func (r *PgRepository) RemoveUserFromBusiness(ctx context.Context, userId, businessId string) error {
 	cmdTags, err := r.exec.Exec(ctx, removeUserFromBusinessQuery, userId, businessId)
 	if err != nil {

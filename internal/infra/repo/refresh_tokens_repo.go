@@ -27,6 +27,7 @@ const (
 	`
 )
 
+// scanRefreshToken scans a single row into a domain.RefreshToken.
 func scanRefreshToken(row pgx.Row) (domain.RefreshToken, error) {
 	var t domain.RefreshToken
 	err := row.Scan(
@@ -42,6 +43,10 @@ func scanRefreshToken(row pgx.Row) (domain.RefreshToken, error) {
 	return t, nil
 }
 
+// CreateRefreshToken stores a refresh token record for userId. token is
+// expected to already be the SHA-256 hash of the raw token handed to the
+// client (see AuthService.hashToken) — the raw token itself is never
+// persisted.
 func (r *PgRepository) CreateRefreshToken(ctx context.Context, userId, token string, expiresAt time.Time) (domain.RefreshToken, error) {
 	t, err := scanRefreshToken(
 		r.exec.QueryRow(ctx, createRefreshTokenQuery, userId, token, expiresAt),
@@ -52,6 +57,8 @@ func (r *PgRepository) CreateRefreshToken(ctx context.Context, userId, token str
 	return t, nil
 }
 
+// GetRefreshToken looks up a refresh token record by its hash (see
+// CreateRefreshToken), returning domain.ErrNotFound if none matches.
 func (r *PgRepository) GetRefreshToken(ctx context.Context, token string) (domain.RefreshToken, error) {
 	t, err := scanRefreshToken(r.exec.QueryRow(ctx, getRefreshTokenQuery, token))
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -63,6 +70,8 @@ func (r *PgRepository) GetRefreshToken(ctx context.Context, token string) (domai
 	return t, nil
 }
 
+// DeleteRefreshToken revokes a refresh token by its hash, returning
+// domain.ErrNotFound if none matches.
 func (r *PgRepository) DeleteRefreshToken(ctx context.Context, token string) error {
 	cmdTag, err := r.exec.Exec(ctx, deleteRefreshTokenQuery, token)
 	if err != nil {

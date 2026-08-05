@@ -92,11 +92,25 @@ func requireLocationRole(ctx context.Context, roles ...domain.LRole) (string, er
 	return "", domain.ErrForbidden
 }
 
+// resolveCallerRole returns the caller's effective role for canActOnRole,
+// substituting domain.Admin for real admins so their session's EmptyRole
+// (they have no location_roles row) is never confused with a non-admin who
+// simply has no role at this location — canActOnRole treats those two cases
+// very differently. Only valid for routes under RequireLocationMember, where
+// the operation's location is the same {locationId} the middleware already
+// resolved ctxkeys.Role against.
+func resolveCallerRole(ctx context.Context) domain.LRole {
+	if ctxkeys.GetIsAdmin(ctx) {
+		return domain.Admin
+	}
+	return ctxkeys.GetRole(ctx)
+}
+
 // canActOnRole determines if the caller is authorized to act on
 // a target's role (ensures hierarchical control)
 func canActOnRole(callerRole, targetRole domain.LRole) bool {
 	// Business admins can schedule anyone
-	if callerRole == domain.EmptyRole {
+	if callerRole == domain.Admin {
 		return true
 	}
 	// LocationLead can schedule managers and employees
@@ -107,8 +121,25 @@ func canActOnRole(callerRole, targetRole domain.LRole) bool {
 	if callerRole == domain.Manager {
 		return targetRole == domain.Employee
 	}
-	// Employee can't schedule anyone (shouldn't reach here anyway)
+	// Employee (and users without a role) can't schedule anyone
 	return false
+}
+
+// checkCanActOnLocationRole enforces the caller's role hierarchy against the
+// target user's role at locationId, skipping the lookup entirely for admins
+// (who trivially canActOnRole anyone).
+func checkCanActOnLocationRole(ctx context.Context, repo domain.Repo, targetUserId, locationId, businessId string) error {
+	if ctxkeys.GetIsAdmin(ctx) {
+		return nil
+	}
+	targetRole, err := repo.GetLocationRole(ctx, targetUserId, locationId, businessId)
+	if err != nil {
+		return err
+	}
+	if !canActOnRole(ctxkeys.GetRole(ctx), targetRole.Role) {
+		return domain.ErrForbidden
+	}
+	return nil
 }
 
 // canActOnBusinessMember checks if the caller's admin status permits them to act

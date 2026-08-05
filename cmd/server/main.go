@@ -62,6 +62,9 @@ func main() {
 	employeeService := service.NewEmployeeService(pgRepo)
 	employeeHandler := handler.NewEmployeeHandler(employeeService, authService, cfg.JWTSecret)
 
+	locationRoleService := service.NewLocationRoleService(pgRepo)
+	locationRoleHandler := handler.NewLocationRoleHandler(locationRoleService, authService, cfg.JWTSecret)
+
 	// Setup router
 	r := chi.NewRouter()
 	r.Use(chiMiddleware.Logger)
@@ -89,6 +92,7 @@ func main() {
 	positionHandler.SetupRoutes(r)
 	shiftHandler.SetupRoutes(r)
 	employeeHandler.SetupRoutes(r)
+	locationRoleHandler.SetupRoutes(r)
 
 	// Listen
 	log.Printf("Server started on port %s", cfg.ApiPort)

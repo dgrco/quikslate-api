@@ -35,7 +35,12 @@ func Null[T any]() Option[T] {
 	return Option[T]{isSet: true, isNull: true}
 }
 
-func (o Option[T]) IsSet() bool  { return o.isSet }
+// IsSet reports whether the Option was explicitly given a value (Some or
+// Null) rather than left absent (None).
+func (o Option[T]) IsSet() bool { return o.isSet }
+
+// IsNull reports whether the Option was explicitly set to null (Null).
+// Meaningless if IsSet is false.
 func (o Option[T]) IsNull() bool { return o.isNull }
 
 // GetValue 'unwraps' the Option and extracts the value and valid status boolean.

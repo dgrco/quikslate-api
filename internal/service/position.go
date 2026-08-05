@@ -12,6 +12,7 @@ type PositionService struct {
 	repo domain.Repo
 }
 
+// NewPositionService constructs a PositionService backed by repo.
 func NewPositionService(repo domain.Repo) *PositionService {
 	return &PositionService{
 		repo,

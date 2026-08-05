@@ -37,6 +37,7 @@ const (
 	`
 )
 
+// scanBusiness scans a single row into a domain.Business.
 func scanBusiness(row pgx.Row) (domain.Business, error) {
 	var b domain.Business
 	err := row.Scan(
@@ -51,6 +52,7 @@ func scanBusiness(row pgx.Row) (domain.Business, error) {
 	return b, nil
 }
 
+// CreateBusiness inserts a new business row and returns it.
 func (r *PgRepository) CreateBusiness(ctx context.Context, name string) (domain.Business, error) {
 	b, err := scanBusiness(r.exec.QueryRow(ctx, createBusinessQuery, name))
 	if err != nil {
@@ -59,6 +61,8 @@ func (r *PgRepository) CreateBusiness(ctx context.Context, name string) (domain.
 	return b, nil
 }
 
+// GetBusinessById fetches a business by id, returning domain.ErrNotFound if
+// no such business exists.
 func (r *PgRepository) GetBusinessById(ctx context.Context, id string) (domain.Business, error) {
 	b, err := scanBusiness(r.exec.QueryRow(ctx, getBusinessByIdQuery, id))
 	if err != nil {
@@ -72,6 +76,9 @@ func (r *PgRepository) GetBusinessById(ctx context.Context, id string) (domain.B
 	return b, nil
 }
 
+// GetBusinessesByUserId returns every business userId is a member of, via a
+// join through business_members. Returns an empty slice, not an error, if
+// they're a member of none.
 func (r *PgRepository) GetBusinessesByUserId(ctx context.Context, userId string) ([]domain.Business, error) {
 	// In the future I may separate this into a separate function like the rest
 	rows, err := r.exec.Query(ctx, getBusinessesByUserIdQuery, userId)
@@ -94,6 +101,8 @@ func (r *PgRepository) GetBusinessesByUserId(ctx context.Context, userId string)
 	return businesses, nil
 }
 
+// ChangeBusinessName renames a business, returning domain.ErrNotFound if id
+// doesn't match any row.
 func (r *PgRepository) ChangeBusinessName(ctx context.Context, id, newName string) error {
 	cmdTag, err := r.exec.Exec(ctx, changeBusinessNameQuery, newName, id)
 	if err != nil {
@@ -105,6 +114,9 @@ func (r *PgRepository) ChangeBusinessName(ctx context.Context, id, newName strin
 	return nil
 }
 
+// DeleteBusiness deletes a business by id, returning domain.ErrNotFound if
+// id doesn't match any row. Locations, members, etc. cascade via FK
+// ON DELETE CASCADE.
 func (r *PgRepository) DeleteBusiness(ctx context.Context, id string) error {
 	cmdTag, err := r.exec.Exec(ctx, deleteBusinessQuery, id)
 	if err != nil {

@@ -21,6 +21,12 @@ const (
 		FROM business_members
 		WHERE user_id = $1 AND business_id = $2
 	`
+	getBusinessMemberDetailsByBusinessId = `
+		SELECT bm.user_id, bm.business_id, u.name, u.email, bm.is_primary_admin, bm.is_admin, bm.created_at, bm.updated_at
+		FROM business_members bm
+		JOIN users u ON bm.user_id = u.id
+		WHERE bm.business_id = $1
+	`
 	setAdminForBusinessMemberQuery = `
 		UPDATE business_members
 		SET is_admin = $3, updated_at = NOW()
@@ -50,12 +56,41 @@ func scanBusinessMemberFields(bm *domain.BusinessMember, scan func(...any) error
 	)
 }
 
+func scanBusinessMemberDetailFields(bmd *domain.BusinessMemberDetail, scan func(...any) error) error {
+	return scan(
+		&bmd.UserId,
+		&bmd.BusinessId,
+		&bmd.Name,
+		&bmd.Email,
+		&bmd.IsPrimaryAdmin,
+		&bmd.IsAdmin,
+		&bmd.CreatedAt,
+		&bmd.UpdatedAt,
+	)
+}
+
 func scanBusinessMember(row pgx.Row) (domain.BusinessMember, error) {
 	var bm domain.BusinessMember
 	if err := scanBusinessMemberFields(&bm, row.Scan); err != nil {
-		return domain.BusinessMember{}, err
+return domain.BusinessMember{}, err
 	}
 	return bm, nil
+}
+
+func scanBusinessMemberDetails(rows pgx.Rows) ([]domain.BusinessMemberDetail, error) {
+	bmds := []domain.BusinessMemberDetail{}
+	for rows.Next() {
+		var bmd domain.BusinessMemberDetail
+		err := scanBusinessMemberDetailFields(&bmd, rows.Scan)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan business member details: %w", err)
+		}
+		bmds = append(bmds, bmd)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate business member details: %w", err)
+	}
+	return bmds, nil
 }
 
 func (r *PgRepository) AddUserToBusiness(
@@ -86,6 +121,21 @@ func (r *PgRepository) GetBusinessMember(ctx context.Context, userId, businessId
 		}
 	}
 	return bm, nil
+}
+
+func (r *PgRepository) GetBusinessMemberDetailsByBusinessId(ctx context.Context, businessId string) ([]domain.BusinessMemberDetail, error) {
+	rows, err := r.exec.Query(ctx, getBusinessMemberDetailsByBusinessId, businessId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get business member details: %w", err)
+	}
+	defer rows.Close()
+
+	bmds, err := scanBusinessMemberDetails(rows)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get business member details: %w", err)
+	}
+
+	return bmds, nil
 }
 
 func (r *PgRepository) SetAdminForBusinessMember(ctx context.Context, userId, businessId string, admin bool) error {

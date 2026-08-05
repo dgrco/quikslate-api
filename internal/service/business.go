@@ -79,6 +79,22 @@ func (bs *BusinessService) GetBusiness(ctx context.Context) (domain.Business, er
 	return b, nil
 }
 
+// Get Business Member Details for every user in a business.
+// Implicit parameters set by http context: {businessId}
+// (Authorization: admin)
+func (bs *BusinessService) GetBusinessMemberDetailsByBusinessId(ctx context.Context) ([]domain.BusinessMemberDetail, error) {
+	if err := validateIsAdmin(ctx); err != nil {
+		return nil, fmt.Errorf("failed to get business member details by business ID: %w", err)
+	}
+	businessId := ctxkeys.GetBusinessId(ctx)
+
+	bmds, err := bs.repo.GetBusinessMemberDetailsByBusinessId(ctx, businessId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get business member details by business ID: %w", err)
+	}
+	return bmds, nil
+}
+
 // Rename a Business.
 // Implicit parameters set by http context: {businessId}
 // (Authorization: admin)

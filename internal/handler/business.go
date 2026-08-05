@@ -168,6 +168,7 @@ func (h *BusinessHandler) GetBusiness(w http.ResponseWriter, r *http.Request) {
 //	@Param			businessId	path		string	true	"Business ID"
 //	@Success		200			{array}	[]BusinessMemberDetailDTO
 //	@Failure		401			{object}	response.errorResponse
+//	@Failure		403			{object}	response.errorResponse
 //	@Router			/businesses/{businessId}/members [get]
 func (h *BusinessHandler) GetBusinessMemberDetails(w http.ResponseWriter, r *http.Request) {
 	bmds, err := h.businessService.GetBusinessMemberDetailsByBusinessId(r.Context())

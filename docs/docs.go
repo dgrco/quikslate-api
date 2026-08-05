@@ -1595,6 +1595,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
                         }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
                     }
                 }
             }

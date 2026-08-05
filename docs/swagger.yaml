@@ -1323,6 +1323,10 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
       security:
       - BearerAuth: []
       summary: Get business member details

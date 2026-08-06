@@ -65,12 +65,14 @@ func (ss *ShiftService) CreateShift(
 }
 
 // Get a Shift by shiftId
-// (Authorization: All)
+// (Authorization: All - location scoped)
 func (ss *ShiftService) GetShift(
 	ctx context.Context,
 	shiftId string,
 ) (domain.Shift, error) {
-	// validate shift -> location -> business -> role authorization sequence
+	if _, err := requireLocationRole(ctx, domain.Manager, domain.LocationLead, domain.Employee); err != nil {
+		return domain.Shift{}, fmt.Errorf("failed to get shift: %w", err)
+	}
 	s, err := getAndValidateShift(ctx, ss.repo, shiftId)
 	if err != nil {
 		return domain.Shift{}, fmt.Errorf("failed to get shift: %w", err)

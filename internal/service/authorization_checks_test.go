@@ -19,7 +19,13 @@ func TestCanActOnRole(t *testing.T) {
 		{"admin can act on employee", domain.Admin, domain.Employee, true},
 		{"admin can act on manager", domain.Admin, domain.Manager, true},
 		{"admin can act on location lead", domain.Admin, domain.LocationLead, true},
-		{"admin can act on another admin", domain.Admin, domain.Admin, true}, // NOTE: is this problematic?
+		// Same rank as the caller is rejected uniformly, even for Admin — this
+		// used to return true (flagged here as "is this problematic?" before it
+		// was ever fixed); rank(Admin) > rank(Admin) is false like any other
+		// same-rank pair, which is also what makes self-targeting rejection
+		// fall out of this same check for free elsewhere (AssignRole/RemoveRole
+		// no longer need a separate check for it).
+		{"admin cannot act on another admin", domain.Admin, domain.Admin, false},
 
 		{"location lead can act on employee", domain.LocationLead, domain.Employee, true},
 		{"location lead can act on manager", domain.LocationLead, domain.Manager, true},

@@ -80,6 +80,38 @@ func (bs *BusinessService) GetBusiness(ctx context.Context) (domain.Business, er
 	return b, nil
 }
 
+// MyBusinessMembership is the caller's own standing within a business: their
+// admin status (read straight from context — already computed fresh by
+// RequireBusinessMember for this request, so no extra DB call) plus every
+// location role they hold within it. It exists so the frontend can decide
+// what admin-only or location-scoped UI to show without probing each action
+// individually and reacting to 403s.
+type MyBusinessMembership struct {
+	IsAdmin        bool
+	IsPrimaryAdmin bool
+	LocationRoles  []domain.LocationRole
+}
+
+// GetMyBusinessMembership returns the caller's own admin status and location
+// roles for businessId.
+// Implicit parameters set by http context: {businessId}
+// (Authorization: any business member — this is a self-lookup, not a
+// listing of others)
+func (bs *BusinessService) GetMyBusinessMembership(ctx context.Context) (MyBusinessMembership, error) {
+	businessId := ctxkeys.GetBusinessId(ctx)
+
+	roles, err := bs.repo.GetLocationRolesByUserAndBusiness(ctx, ctxkeys.GetUserId(ctx), businessId)
+	if err != nil {
+		return MyBusinessMembership{}, fmt.Errorf("failed to get my business membership: %w", err)
+	}
+
+	return MyBusinessMembership{
+		IsAdmin:        ctxkeys.GetIsAdmin(ctx),
+		IsPrimaryAdmin: ctxkeys.GetIsPrimaryAdmin(ctx),
+		LocationRoles:  roles,
+	}, nil
+}
+
 // Get Business Member Details for every user in a business.
 // Implicit parameters set by http context: {businessId}
 // (Authorization: admin)

@@ -31,9 +31,9 @@ LOCATION_ID=$(echo "$LOCATION_RESP" | jq -r .location.id)
 [ "$LOCATION_ID" != "null" ] || { echo "FAILED: create location"; exit 1; }
 
 echo "== create invite =="
-INVITE_RESP=$(curl -s -X POST "$BASE/businesses/$BUSINESS_ID/invites" \
+INVITE_RESP=$(curl -s -X POST "$BASE/businesses/$BUSINESS_ID/locations/$LOCATION_ID/invites" \
   -H "Authorization: Bearer $ACCESS" -H "Content-Type: application/json" \
-  -d "{\"email\":\"employee@test.com\",\"location_id\":\"$LOCATION_ID\",\"target_role\":\"employee\"}")
+  -d "{\"email\":\"employee@test.com\",\"target_role\":\"employee\"}")
 echo "$INVITE_RESP" | jq .
 TOKEN=$(echo "$INVITE_RESP" | jq -r .invite_token)
 [ "$TOKEN" != "null" ] || { echo "FAILED: create invite"; exit 1; }

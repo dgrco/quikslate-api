@@ -92,13 +92,11 @@ func requireLocationRole(ctx context.Context, roles ...domain.LRole) (string, er
 	return "", domain.ErrForbidden
 }
 
-// resolveCallerRole returns the caller's effective role for canActOnRole,
-// substituting domain.Admin for real admins so their session's EmptyRole
-// (they have no location_roles row) is never confused with a non-admin who
-// simply has no role at this location — canActOnRole treats those two cases
-// very differently. Only valid for routes under RequireLocationMember, where
-// the operation's location is the same {locationId} the middleware already
-// resolved ctxkeys.Role against.
+// resolveCallerRole returns the caller's effective role for canActOnRole:
+// domain.Admin for business admins, otherwise their location role from
+// context. This avoids confusing an admin's EmptyRole (no location_roles
+// row) with a non-admin's genuine lack of role. Only valid under
+// RequireLocationMember, for the same {locationId} it resolved.
 func resolveCallerRole(ctx context.Context) domain.LRole {
 	if ctxkeys.GetIsAdmin(ctx) {
 		return domain.Admin
@@ -106,23 +104,39 @@ func resolveCallerRole(ctx context.Context) domain.LRole {
 	return ctxkeys.GetRole(ctx)
 }
 
-// canActOnRole determines if the caller is authorized to act on
-// a target's role (ensures hierarchical control)
+// rank orders the location-role hierarchy from EmptyRole (lowest) to Admin
+// (highest), so canActOnRole can compare roles with one comparison.
+func rank(role domain.LRole) int {
+	switch role {
+	case domain.Admin:
+		return 3
+	case domain.LocationLead:
+		return 2
+	case domain.Manager:
+		return 1
+	case domain.Employee:
+		return 0
+	default: // EmptyRole
+		return -1
+	}
+}
+
+// canActOnRole reports whether callerRole may act on targetRole: the caller
+// must strictly outrank the target (rank(caller) > rank(target)). Same rank
+// or higher is always rejected, including Admin on Admin. To check a
+// target's actual current standing rather than a candidate role, pass
+// effectiveRole(target.IsAdmin, target's LRole) as targetRole.
 func canActOnRole(callerRole, targetRole domain.LRole) bool {
-	// Business admins can schedule anyone
-	if callerRole == domain.Admin {
-		return true
+	return rank(callerRole) > rank(targetRole)
+}
+
+// effectiveRole returns domain.Admin if isAdmin, otherwise locationRole —
+// folding business-admin status into a single value for rank comparisons.
+func effectiveRole(isAdmin bool, locationRole domain.LRole) domain.LRole {
+	if isAdmin {
+		return domain.Admin
 	}
-	// LocationLead can schedule managers and employees
-	if callerRole == domain.LocationLead {
-		return targetRole == domain.Manager || targetRole == domain.Employee
-	}
-	// Manager can only schedule employees
-	if callerRole == domain.Manager {
-		return targetRole == domain.Employee
-	}
-	// Employee (and users without a role) can't schedule anyone
-	return false
+	return locationRole
 }
 
 // checkCanActOnLocationRole enforces the caller's role hierarchy against the

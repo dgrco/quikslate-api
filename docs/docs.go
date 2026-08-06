@@ -229,13 +229,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "array",
-                                "items": {
-                                    "$ref": "#/definitions/internal_handler.BusinessDTO"
-                                }
-                            }
+                            "$ref": "#/definitions/internal_handler.MultipleBusinessResponse"
                         }
                     },
                     "401": {
@@ -570,70 +564,6 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/internal_handler.SimpleResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/businesses/{businessId}/invites": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Invite an email address to join the business at a location with a target role. Admin, or LocationLead at the target location (may only invite Managers or Employees, see canActOnRole).",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "invites"
-                ],
-                "summary": "Create invite",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Business ID",
-                        "name": "businessId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Invite details",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/internal_handler.createInviteRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/internal_handler.CreateInviteResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
                         }
                     },
                     "401": {
@@ -1033,6 +963,247 @@ const docTemplate = `{
                 }
             }
         },
+        "/businesses/{businessId}/locations/{locationId}/invites": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "List every not-yet-accepted invite at a location. Admin, or LocationLead at this location.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "invites"
+                ],
+                "summary": "List pending invites",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Business ID",
+                        "name": "businessId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Location ID",
+                        "name": "locationId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler.MultiplePendingInviteResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Invite an email address to join the business at this location with a target role. Admin, or LocationLead at this location (may only invite Managers or Employees, see canActOnRole).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "invites"
+                ],
+                "summary": "Create invite",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Business ID",
+                        "name": "businessId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Location ID",
+                        "name": "locationId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Invite details",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler.createInviteRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler.CreateInviteResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/businesses/{businessId}/locations/{locationId}/invites/{inviteId}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Cancel a not-yet-accepted invite at a location, freeing the email up to be invited again. Admin, or LocationLead who outranks the invite's target role.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "invites"
+                ],
+                "summary": "Revoke invite",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Business ID",
+                        "name": "businessId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Location ID",
+                        "name": "locationId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Invite ID",
+                        "name": "inviteId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler.SimpleResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/businesses/{businessId}/locations/{locationId}/members": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "List every business member, for assigning a role at this location. Admin, or LocationLead at this location.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "location-roles"
+                ],
+                "summary": "List assignable members",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Business ID",
+                        "name": "businessId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Location ID",
+                        "name": "locationId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler.MultipleBusinessMemberDetailResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/businesses/{businessId}/locations/{locationId}/roles": {
             "get": {
                 "security": [
@@ -1093,7 +1264,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Assign or change a business member's role at a location. Admin, LocationLead, or Manager (within the role hierarchy).",
+                "description": "Assign or change a business member's role at a location. Admin, LocationLead, or Manager (within the role hierarchy). The caller must outrank the target's current standing (role, or business-admin status), not just the role being granted — this covers self-targeting and admin-targeting automatically.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1169,7 +1340,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Remove a business member's role at a location. Admin, LocationLead, or Manager (within the role hierarchy).",
+                "description": "Remove a business member's role at a location. Admin or LocationLead, outranking the target's current standing (role, or business-admin status) — Manager can view the roster but not remove from it. Covers self-targeting and admin-targeting automatically.",
                 "produces": [
                     "application/json"
                 ],
@@ -1776,13 +1947,53 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "array",
-                                "items": {
-                                    "$ref": "#/definitions/internal_handler.BusinessMemberDetailDTO"
-                                }
-                            }
+                            "$ref": "#/definitions/internal_handler.MultipleBusinessMemberDetailResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/businesses/{businessId}/members/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get the caller's own admin status and location roles within this business. Lets the frontend decide what admin-only or location-scoped UI to show, without probing each action individually.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "businesses"
+                ],
+                "summary": "Get my business membership",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Business ID",
+                        "name": "businessId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler.MyBusinessMembershipResponse"
                         }
                     },
                     "401": {
@@ -2475,6 +2686,28 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_handler.MultipleBusinessMemberDetailResponse": {
+            "type": "object",
+            "properties": {
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_handler.BusinessMemberDetailDTO"
+                    }
+                }
+            }
+        },
+        "internal_handler.MultipleBusinessResponse": {
+            "type": "object",
+            "properties": {
+                "businesses": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_handler.BusinessDTO"
+                    }
+                }
+            }
+        },
         "internal_handler.MultipleEmployeePositionResponse": {
             "type": "object",
             "properties": {
@@ -2508,6 +2741,17 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_handler.MultiplePendingInviteResponse": {
+            "type": "object",
+            "properties": {
+                "invites": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_handler.PendingInviteDTO"
+                    }
+                }
+            }
+        },
         "internal_handler.MultiplePositionResponse": {
             "type": "object",
             "properties": {
@@ -2527,6 +2771,60 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/github_com_dgrco_quikslate_internal_domain.Shift"
                     }
+                }
+            }
+        },
+        "internal_handler.MyBusinessMembershipResponse": {
+            "type": "object",
+            "properties": {
+                "is_admin": {
+                    "type": "boolean"
+                },
+                "is_primary_admin": {
+                    "type": "boolean"
+                },
+                "location_roles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_handler.MyLocationRoleDTO"
+                    }
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handler.MyLocationRoleDTO": {
+            "type": "object",
+            "properties": {
+                "location_id": {
+                    "type": "string"
+                },
+                "role": {
+                    "$ref": "#/definitions/github_com_dgrco_quikslate_internal_domain.LRole"
+                }
+            }
+        },
+        "internal_handler.PendingInviteDTO": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "location_id": {
+                    "type": "string"
+                },
+                "role": {
+                    "$ref": "#/definitions/github_com_dgrco_quikslate_internal_domain.LRole"
                 }
             }
         },
@@ -2606,9 +2904,6 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "email": {
-                    "type": "string"
-                },
-                "location_id": {
                     "type": "string"
                 },
                 "target_role": {

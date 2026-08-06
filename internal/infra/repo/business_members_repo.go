@@ -77,7 +77,7 @@ func scanBusinessMemberDetailFields(bmd *domain.BusinessMemberDetail, scan func(
 func scanBusinessMember(row pgx.Row) (domain.BusinessMember, error) {
 	var bm domain.BusinessMember
 	if err := scanBusinessMemberFields(&bm, row.Scan); err != nil {
-return domain.BusinessMember{}, err
+		return domain.BusinessMember{}, err
 	}
 	return bm, nil
 }

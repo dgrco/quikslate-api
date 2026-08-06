@@ -27,6 +27,8 @@ type Shift struct {
 	UpdatedAt  time.Time   `json:"updated_at"`
 }
 
+// ValidateShiftTimes returns ErrInvalidShiftTimes unless startTime is
+// strictly before endTime.
 func ValidateShiftTimes(startTime, endTime time.Time) error {
 	if !startTime.Before(endTime) {
 		return ErrInvalidShiftTimes

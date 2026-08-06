@@ -15,6 +15,7 @@ type InviteService struct {
 	repo domain.Repo
 }
 
+// NewInviteService constructs an InviteService backed by repo.
 func NewInviteService(repo domain.Repo) *InviteService {
 	return &InviteService{
 		repo,
@@ -33,33 +34,21 @@ type InviteDTO struct {
 }
 
 // CreateInvite creates an outstanding invite to a (potential) user's email
-// (Authorization: Admin, or LocationLead at the target location)
+// at locationId.
+// (Authorization: Admin, or LocationLead at this location. Manager is
+// excluded: this can bring an entirely new person into the business, a
+// broader capability than Manager's role-assignment authority warrants.)
 func (s *InviteService) CreateInvite(
 	ctx context.Context,
-	email string,
 	locationId string,
+	email string,
 	targetRole domain.LRole,
 ) (InviteResult, error) {
 	businessId := ctxkeys.GetBusinessId(ctx)
+	callerRole := resolveCallerRole(ctx)
 
-	// This route is business-scoped (RequireBusinessMember), so ctxkeys.Role/
-	// LocationId are never set — look up the caller's role at the invite's
-	// target location directly instead of trusting session context.
-	l, err := s.repo.GetLocationById(ctx, locationId)
-	if err != nil {
-		return InviteResult{}, fmt.Errorf("failed to create invite: %w", err)
-	}
-	if l.BusinessId != businessId {
-		return InviteResult{}, fmt.Errorf("failed to create invite: %w", domain.ErrForbidden)
-	}
-
-	callerRole := domain.EmptyRole
-	if !ctxkeys.GetIsAdmin(ctx) {
-		lr, err := s.repo.GetLocationRole(ctx, ctxkeys.GetUserId(ctx), locationId, businessId)
-		if err != nil || lr.Role != domain.LocationLead {
-			return InviteResult{}, fmt.Errorf("failed to create invite: %w", domain.ErrForbidden)
-		}
-		callerRole = lr.Role
+	if callerRole != domain.Admin && callerRole != domain.LocationLead {
+		return InviteResult{}, domain.ErrForbidden
 	}
 
 	// Enforce caller -> target role hierarchy
@@ -68,12 +57,13 @@ func (s *InviteService) CreateInvite(
 	}
 
 	// Precondition check: user must not already have a pending invite
-	_, err = s.repo.GetPendingInviteByEmailAndBusinessId(ctx, email, businessId)
+	_, err := s.repo.GetPendingInviteByEmailAndBusinessId(ctx, email, businessId)
 	if err == nil {
 		// pending invite already exists
 		return InviteResult{}, fmt.Errorf("failed to create invite: %w", domain.ErrAlreadyExists)
 	}
 	if !errors.Is(err, domain.ErrNotFound) {
+		// If there is an error and it's unrelated to ErrNotFound, return it
 		return InviteResult{}, fmt.Errorf("failed to create invite: %w", err)
 	}
 
@@ -87,6 +77,7 @@ func (s *InviteService) CreateInvite(
 		}
 	}
 	if err != nil && !errors.Is(err, domain.ErrNotFound) {
+		// If there is an error and it's unrelated to ErrNotFound, return it
 		return InviteResult{}, fmt.Errorf("failed to create invite: %w", err)
 	}
 
@@ -96,7 +87,7 @@ func (s *InviteService) CreateInvite(
 	}
 	tokenHash := hashToken(token)
 
-	// Validation
+	// Validation -- @TODO: perhaps move this up for better optimization
 	email = domain.NormalizeEmail(email)
 	if err := domain.ValidateEmail(email); err != nil {
 		return InviteResult{}, fmt.Errorf("failed to create invite: %w", err)
@@ -142,6 +133,47 @@ func (s *InviteService) PreviewInviteByToken(ctx context.Context, token string) 
 	}
 
 	return dto, nil
+}
+
+// GetPendingInvites returns every not-yet-accepted invite at locationId,
+// including ones another caller created, so an admin or LocationLead can
+// see who's already been invited.
+// (Authorization: admin, or LocationLead at this location)
+func (s *InviteService) GetPendingInvites(ctx context.Context, locationId string) ([]domain.Invite, error) {
+	callerRole := resolveCallerRole(ctx)
+	if callerRole != domain.Admin && callerRole != domain.LocationLead {
+		return nil, domain.ErrForbidden
+	}
+
+	invites, err := s.repo.GetPendingInvitesByLocationId(ctx, locationId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pending invites: %w", err)
+	}
+	return invites, nil
+}
+
+// RevokeInvite cancels a not-yet-accepted invite at locationId, freeing the
+// email up to be invited again.
+// (Authorization: admin, or LocationLead who outranks the invite's target
+// role — a LocationLead can't revoke an invite for a role they couldn't
+// have created themselves, e.g. one for a fellow LocationLead.)
+func (s *InviteService) RevokeInvite(ctx context.Context, locationId, inviteId string) error {
+	inv, err := s.repo.GetInviteById(ctx, inviteId)
+	if err != nil {
+		return fmt.Errorf("failed to revoke invite: %w", err)
+	}
+	if inv.LocationId != locationId {
+		return domain.ErrNotFound
+	}
+
+	if !canActOnRole(resolveCallerRole(ctx), inv.Role) {
+		return domain.ErrForbidden
+	}
+
+	if err := s.repo.DeleteInvite(ctx, inviteId); err != nil {
+		return fmt.Errorf("failed to revoke invite: %w", err)
+	}
+	return nil
 }
 
 // AcceptInvite accepts an invite if validated and returns the associated businessId.

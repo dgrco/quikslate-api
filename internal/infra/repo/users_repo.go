@@ -32,6 +32,7 @@ const (
 	`
 )
 
+// scanUser scans a single row into a domain.User.
 func scanUser(row pgx.Row) (domain.User, error) {
 	var u domain.User
 	err := row.Scan(
@@ -50,6 +51,8 @@ func scanUser(row pgx.Row) (domain.User, error) {
 
 // Implement UserRepository interface for PgRepository
 
+// CreateUser inserts a new user with an already-hashed password, returning
+// domain.ErrAlreadyExists if email is already taken.
 func (r *PgRepository) CreateUser(ctx context.Context, email, name, passwordHash string) (domain.User, error) {
 	u, err := scanUser(r.exec.QueryRow(ctx, createUserQuery, email, name, passwordHash))
 	if err != nil {
@@ -62,6 +65,8 @@ func (r *PgRepository) CreateUser(ctx context.Context, email, name, passwordHash
 	return u, nil
 }
 
+// GetUserByEmail fetches a user by email, returning domain.ErrNotFound if no
+// such user exists.
 func (r *PgRepository) GetUserByEmail(ctx context.Context, email string) (domain.User, error) {
 	u, err := scanUser(r.exec.QueryRow(ctx, getUserByEmailQuery, email))
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -74,6 +79,8 @@ func (r *PgRepository) GetUserByEmail(ctx context.Context, email string) (domain
 	return u, nil
 }
 
+// GetUserById fetches a user by id, returning domain.ErrNotFound if no such
+// user exists.
 func (r *PgRepository) GetUserById(ctx context.Context, id string) (domain.User, error) {
 	u, err := scanUser(r.exec.QueryRow(ctx, getUserByIdQuery, id))
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -86,6 +93,9 @@ func (r *PgRepository) GetUserById(ctx context.Context, id string) (domain.User,
 	return u, nil
 }
 
+// DeleteUser deletes a user by id. Unlike the other repos' delete methods,
+// this doesn't check RowsAffected and so silently succeeds even if id
+// matched no row.
 func (r *PgRepository) DeleteUser(ctx context.Context, id string) error {
 	_, err := r.exec.Exec(ctx, deleteUserQuery, id)
 	if err != nil {

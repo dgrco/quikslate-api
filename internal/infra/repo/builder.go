@@ -40,6 +40,8 @@ func (b *updateBuilder) Build(table, idColumn string, id any) (string, []any) {
 	return query, b.args
 }
 
+// IsEmpty reports whether Add has been called yet, letting callers skip
+// issuing an UPDATE with no columns to set.
 func (b *updateBuilder) IsEmpty() bool {
 	return len(b.setClauses) == 0
 }

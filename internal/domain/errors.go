@@ -19,10 +19,15 @@ type ValidationError struct {
 	Message string
 }
 
+// Error implements the error interface, returning the validation message
+// as-is (it's already meant to be shown to the client).
 func (e *ValidationError) Error() string {
 	return e.Message
 }
 
+// NewValidationError wraps message in a *ValidationError, marking it as a
+// client-facing message rather than an internal detail to be logged and
+// hidden (see handleServiceError in internal/handler/errors.go).
 func NewValidationError(message string) error {
 	return &ValidationError{Message: message}
 }

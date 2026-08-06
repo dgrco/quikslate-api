@@ -13,6 +13,7 @@ type ShiftService struct {
 	repo domain.Repo
 }
 
+// NewShiftService constructs a ShiftService backed by repo.
 func NewShiftService(repo domain.Repo) *ShiftService {
 	return &ShiftService{
 		repo,
@@ -46,15 +47,8 @@ func (ss *ShiftService) CreateShift(
 			return domain.Shift{}, fmt.Errorf("failed to create shift: %w", err)
 		}
 		// check is the caller is permitted to assign a shift to the target userId
-		if !ctxkeys.GetIsAdmin(ctx) {
-			locId := ctxkeys.GetLocationId(ctx)
-			targetLocationRole, err := ss.repo.GetLocationRole(ctx, *userId, locId, bm.BusinessId)
-			if err != nil {
-				return domain.Shift{}, fmt.Errorf("failed to assign shift: %w", err)
-			}
-			if !canActOnRole(ctxkeys.GetRole(ctx), targetLocationRole.Role) {
-				return domain.Shift{}, domain.ErrForbidden
-			}
+		if err := checkCanActOnLocationRole(ctx, ss.repo, *userId, ctxkeys.GetLocationId(ctx), bm.BusinessId); err != nil {
+			return domain.Shift{}, fmt.Errorf("failed to create shift: %w", err)
 		}
 	}
 
@@ -71,12 +65,14 @@ func (ss *ShiftService) CreateShift(
 }
 
 // Get a Shift by shiftId
-// (Authorization: All)
+// (Authorization: All - location scoped)
 func (ss *ShiftService) GetShift(
 	ctx context.Context,
 	shiftId string,
 ) (domain.Shift, error) {
-	// validate shift -> location -> business -> role authorization sequence
+	if _, err := requireLocationRole(ctx, domain.Manager, domain.LocationLead, domain.Employee); err != nil {
+		return domain.Shift{}, fmt.Errorf("failed to get shift: %w", err)
+	}
 	s, err := getAndValidateShift(ctx, ss.repo, shiftId)
 	if err != nil {
 		return domain.Shift{}, fmt.Errorf("failed to get shift: %w", err)
@@ -122,17 +118,9 @@ func (ss *ShiftService) UpdateShift(
 	}
 
 	// Hierarchical check
-	if s.UserId != nil && !ctxkeys.GetIsAdmin(ctx) {
-		bm, err := ss.repo.GetBusinessMember(ctx, *s.UserId, ctxkeys.GetBusinessId(ctx))
-		if err != nil {
+	if s.UserId != nil {
+		if err := checkCanActOnLocationRole(ctx, ss.repo, *s.UserId, s.LocationId, ctxkeys.GetBusinessId(ctx)); err != nil {
 			return fmt.Errorf("failed to update shift: %w", err)
-		}
-		targetRole, err := ss.repo.GetLocationRole(ctx, *s.UserId, s.LocationId, bm.BusinessId)
-		if err != nil {
-			return fmt.Errorf("failed to update shift: %w", err)
-		}
-		if !canActOnRole(ctxkeys.GetRole(ctx), targetRole.Role) {
-			return domain.ErrForbidden
 		}
 	}
 
@@ -183,15 +171,8 @@ func (ss *ShiftService) AssignShift(
 	}
 
 	// check is the caller is permitted to assign a shift to the target userId
-	if !ctxkeys.GetIsAdmin(ctx) {
-		locId := ctxkeys.GetLocationId(ctx)
-		targetLocationRole, err := ss.repo.GetLocationRole(ctx, userId, locId, bm.BusinessId)
-		if err != nil {
-			return fmt.Errorf("failed to assign shift: %w", err)
-		}
-		if !canActOnRole(ctxkeys.GetRole(ctx), targetLocationRole.Role) {
-			return domain.ErrForbidden
-		}
+	if err := checkCanActOnLocationRole(ctx, ss.repo, userId, ctxkeys.GetLocationId(ctx), bm.BusinessId); err != nil {
+		return fmt.Errorf("failed to assign shift: %w", err)
 	}
 
 	if err := ss.repo.AssignShift(ctx, shiftId, userId); err != nil {
@@ -220,19 +201,8 @@ func (ss *ShiftService) UnassignShift(
 		return fmt.Errorf("failed to unassign shift: %w", err)
 	}
 
-	bm, err := ss.repo.GetBusinessMember(ctx, *s.UserId, ctxkeys.GetBusinessId(ctx))
-	if err != nil {
+	if err := checkCanActOnLocationRole(ctx, ss.repo, *s.UserId, s.LocationId, ctxkeys.GetBusinessId(ctx)); err != nil {
 		return fmt.Errorf("failed to unassign shift: %w", err)
-	}
-
-	if !ctxkeys.GetIsAdmin(ctx) {
-		targetRole, err := ss.repo.GetLocationRole(ctx, *s.UserId, s.LocationId, bm.BusinessId)
-		if err != nil {
-			return fmt.Errorf("failed to unassign shift: %w", err)
-		}
-		if !canActOnRole(ctxkeys.GetRole(ctx), targetRole.Role) {
-			return domain.ErrForbidden
-		}
 	}
 
 	if err := ss.repo.UnassignShift(ctx, shiftId); err != nil {
@@ -258,18 +228,9 @@ func (ss *ShiftService) CancelShift(
 	}
 
 	// Hierarchical check
-	if s.UserId != nil && !ctxkeys.GetIsAdmin(ctx) {
-		bm, err := ss.repo.GetBusinessMember(ctx, *s.UserId, ctxkeys.GetBusinessId(ctx))
-		if err != nil {
+	if s.UserId != nil {
+		if err := checkCanActOnLocationRole(ctx, ss.repo, *s.UserId, s.LocationId, ctxkeys.GetBusinessId(ctx)); err != nil {
 			return fmt.Errorf("failed to cancel shift: %w", err)
-		}
-		targetRole, err := ss.repo.GetLocationRole(ctx, *s.UserId, s.LocationId,
-			bm.BusinessId)
-		if err != nil {
-			return fmt.Errorf("failed to cancel shift: %w", err)
-		}
-		if !canActOnRole(ctxkeys.GetRole(ctx), targetRole.Role) {
-			return domain.ErrForbidden
 		}
 	}
 

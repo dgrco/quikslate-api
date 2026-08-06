@@ -13,21 +13,24 @@ definitions:
     - manager
     - location_lead
     - ""
+    - admin
     type: string
     x-enum-comments:
-      EmptyRole: for admins/identity-only
+      EmptyRole: no location-scoped role (identity-only sessions)
       LocationLead: manages (leads) all roles at a location
       Manager: manages employees
     x-enum-descriptions:
     - ""
     - manages employees
     - manages (leads) all roles at a location
-    - for admins/identity-only
+    - no location-scoped role (identity-only sessions)
+    - ""
     x-enum-varnames:
     - Employee
     - Manager
     - LocationLead
     - EmptyRole
+    - Admin
   github_com_dgrco_quikslate_internal_domain.Location:
     properties:
       address:
@@ -152,6 +155,39 @@ definitions:
       invite_token:
         type: string
     type: object
+  internal_handler.LocationRoleDetailDTO:
+    properties:
+      business_id:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      location_id:
+        type: string
+      name:
+        type: string
+      role:
+        $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.LRole'
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  internal_handler.MultipleBusinessMemberDetailResponse:
+    properties:
+      members:
+        items:
+          $ref: '#/definitions/internal_handler.BusinessMemberDetailDTO'
+        type: array
+    type: object
+  internal_handler.MultipleBusinessResponse:
+    properties:
+      businesses:
+        items:
+          $ref: '#/definitions/internal_handler.BusinessDTO'
+        type: array
+    type: object
   internal_handler.MultipleEmployeePositionResponse:
     properties:
       positions:
@@ -164,6 +200,20 @@ definitions:
       locations:
         items:
           $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.Location'
+        type: array
+    type: object
+  internal_handler.MultipleLocationRoleResponse:
+    properties:
+      roles:
+        items:
+          $ref: '#/definitions/internal_handler.LocationRoleDetailDTO'
+        type: array
+    type: object
+  internal_handler.MultiplePendingInviteResponse:
+    properties:
+      invites:
+        items:
+          $ref: '#/definitions/internal_handler.PendingInviteDTO'
         type: array
     type: object
   internal_handler.MultiplePositionResponse:
@@ -179,6 +229,41 @@ definitions:
         items:
           $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.Shift'
         type: array
+    type: object
+  internal_handler.MyBusinessMembershipResponse:
+    properties:
+      is_admin:
+        type: boolean
+      is_primary_admin:
+        type: boolean
+      location_roles:
+        items:
+          $ref: '#/definitions/internal_handler.MyLocationRoleDTO'
+        type: array
+      user_id:
+        type: string
+    type: object
+  internal_handler.MyLocationRoleDTO:
+    properties:
+      location_id:
+        type: string
+      role:
+        $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.LRole'
+    type: object
+  internal_handler.PendingInviteDTO:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      location_id:
+        type: string
+      role:
+        $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.LRole'
     type: object
   internal_handler.SimpleResponse:
     properties:
@@ -210,6 +295,11 @@ definitions:
       position_id:
         type: string
     type: object
+  internal_handler.assignLocationRoleRequest:
+    properties:
+      role:
+        $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.LRole'
+    type: object
   internal_handler.assignShiftRequest:
     properties:
       user_id:
@@ -223,8 +313,6 @@ definitions:
   internal_handler.createInviteRequest:
     properties:
       email:
-        type: string
-      location_id:
         type: string
       target_role:
         $ref: '#/definitions/github_com_dgrco_quikslate_internal_domain.LRole'
@@ -658,49 +746,6 @@ paths:
       summary: Remove employee position
       tags:
       - employees
-  /businesses/{businessId}/invites:
-    post:
-      consumes:
-      - application/json
-      description: Invite an email address to join the business at a location with
-        a target role. Admin, or LocationLead at the target location (may only invite
-        Managers or Employees, see canActOnRole).
-      parameters:
-      - description: Business ID
-        in: path
-        name: businessId
-        required: true
-        type: string
-      - description: Invite details
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/internal_handler.createInviteRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/internal_handler.CreateInviteResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
-      security:
-      - BearerAuth: []
-      summary: Create invite
-      tags:
-      - invites
   /businesses/{businessId}/invites/{token}:
     get:
       description: Preview a pending invite by its raw token (email, business name,
@@ -951,6 +996,302 @@ paths:
       summary: Update location
       tags:
       - locations
+  /businesses/{businessId}/locations/{locationId}/invites:
+    get:
+      description: List every not-yet-accepted invite at a location. Admin, or LocationLead
+        at this location.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.MultiplePendingInviteResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: List pending invites
+      tags:
+      - invites
+    post:
+      consumes:
+      - application/json
+      description: Invite an email address to join the business at this location with
+        a target role. Admin, or LocationLead at this location (may only invite Managers
+        or Employees, see canActOnRole).
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      - description: Invite details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.createInviteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.CreateInviteResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create invite
+      tags:
+      - invites
+  /businesses/{businessId}/locations/{locationId}/invites/{inviteId}:
+    delete:
+      description: Cancel a not-yet-accepted invite at a location, freeing the email
+        up to be invited again. Admin, or LocationLead who outranks the invite's target
+        role.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      - description: Invite ID
+        in: path
+        name: inviteId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Revoke invite
+      tags:
+      - invites
+  /businesses/{businessId}/locations/{locationId}/members:
+    get:
+      description: List every business member, for assigning a role at this location.
+        Admin, or LocationLead at this location.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.MultipleBusinessMemberDetailResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: List assignable members
+      tags:
+      - location-roles
+  /businesses/{businessId}/locations/{locationId}/roles:
+    get:
+      description: List every business member with a role at a location. Admin, LocationLead,
+        or Manager.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.MultipleLocationRoleResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: List location roles
+      tags:
+      - location-roles
+  /businesses/{businessId}/locations/{locationId}/roles/{userId}:
+    delete:
+      description: Remove a business member's role at a location. Admin or LocationLead,
+        outranking the target's current standing (role, or business-admin status)
+        — Manager can view the roster but not remove from it. Covers self-targeting
+        and admin-targeting automatically.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      - description: Target user ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove location role
+      tags:
+      - location-roles
+    put:
+      consumes:
+      - application/json
+      description: Assign or change a business member's role at a location. Admin,
+        LocationLead, or Manager (within the role hierarchy). The caller must outrank
+        the target's current standing (role, or business-admin status), not just the
+        role being granted — this covers self-targeting and admin-targeting automatically.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      - description: Location ID
+        in: path
+        name: locationId
+        required: true
+        type: string
+      - description: Target user ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      - description: Role to assign
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.assignLocationRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Assign location role
+      tags:
+      - location-roles
   /businesses/{businessId}/locations/{locationId}/shifts:
     get:
       description: List all shifts at a location. Any member of the location (Admin,
@@ -1314,11 +1655,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              items:
-                $ref: '#/definitions/internal_handler.BusinessMemberDetailDTO'
-              type: array
-            type: array
+            $ref: '#/definitions/internal_handler.MultipleBusinessMemberDetailResponse'
         "401":
           description: Unauthorized
           schema:
@@ -1417,6 +1754,37 @@ paths:
       security:
       - BearerAuth: []
       summary: Set business member admin status
+      tags:
+      - businesses
+  /businesses/{businessId}/members/me:
+    get:
+      description: Get the caller's own admin status and location roles within this
+        business. Lets the frontend decide what admin-only or location-scoped UI to
+        show, without probing each action individually.
+      parameters:
+      - description: Business ID
+        in: path
+        name: businessId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.MyBusinessMembershipResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my business membership
       tags:
       - businesses
   /businesses/{businessId}/positions:
@@ -1615,11 +1983,7 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              items:
-                $ref: '#/definitions/internal_handler.BusinessDTO'
-              type: array
-            type: array
+            $ref: '#/definitions/internal_handler.MultipleBusinessResponse'
         "401":
           description: Unauthorized
           schema:

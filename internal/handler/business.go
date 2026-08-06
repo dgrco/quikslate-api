@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/dgrco/quikslate/internal/ctxkeys"
+	"github.com/dgrco/quikslate/internal/domain"
 	"github.com/dgrco/quikslate/internal/response"
 	"github.com/dgrco/quikslate/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -55,6 +57,10 @@ type BusinessDTO struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type MultipleBusinessResponse struct {
+	Businesses []BusinessDTO `json:"businesses"`
+}
+
 type BusinessMemberDetailDTO struct {
 	UserId         string    `json:"user_id"`
 	BusinessId     string    `json:"business_id"`
@@ -64,6 +70,22 @@ type BusinessMemberDetailDTO struct {
 	IsAdmin        bool      `json:"is_admin"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type MultipleBusinessMemberDetailResponse struct {
+	Members []BusinessMemberDetailDTO `json:"members"`
+}
+
+type MyLocationRoleDTO struct {
+	LocationId string       `json:"location_id"`
+	Role       domain.LRole `json:"role"`
+}
+
+type MyBusinessMembershipResponse struct {
+	UserId         string              `json:"user_id"`
+	IsAdmin        bool                `json:"is_admin"`
+	IsPrimaryAdmin bool                `json:"is_primary_admin"`
+	LocationRoles  []MyLocationRoleDTO `json:"location_roles"`
 }
 
 // Handlers
@@ -106,7 +128,7 @@ func (h *BusinessHandler) CreateBusiness(w http.ResponseWriter, r *http.Request)
 // @Tags businesses
 // @Security BearerAuth
 // @Produce json
-// @Success 200 {array} []BusinessDTO
+// @Success 200 {object} MultipleBusinessResponse
 // @Failure 401 {object} response.errorResponse
 // @Router /businesses/me [get]
 func (h *BusinessHandler) GetBusinessesByUser(w http.ResponseWriter, r *http.Request) {
@@ -127,7 +149,7 @@ func (h *BusinessHandler) GetBusinessesByUser(w http.ResponseWriter, r *http.Req
 		dtos = append(dtos, dto)
 	}
 
-	response.WriteJSON(w, dtos, http.StatusOK)
+	response.WriteJSON(w, MultipleBusinessResponse{Businesses: dtos}, http.StatusOK)
 }
 
 // GetBusiness returns the business identified by businessId.
@@ -166,7 +188,7 @@ func (h *BusinessHandler) GetBusiness(w http.ResponseWriter, r *http.Request) {
 //	@Security		BearerAuth
 //	@Produce		json
 //	@Param			businessId	path		string	true	"Business ID"
-//	@Success		200			{array}	[]BusinessMemberDetailDTO
+//	@Success		200			{object}	MultipleBusinessMemberDetailResponse
 //	@Failure		401			{object}	response.errorResponse
 //	@Failure		403			{object}	response.errorResponse
 //	@Router			/businesses/{businessId}/members [get]
@@ -192,7 +214,40 @@ func (h *BusinessHandler) GetBusinessMemberDetails(w http.ResponseWriter, r *htt
 		bmdDTOS = append(bmdDTOS, bmdDTO)
 	}
 
-	response.WriteJSON(w, bmdDTOS, http.StatusOK)
+	response.WriteJSON(w, MultipleBusinessMemberDetailResponse{Members: bmdDTOS}, http.StatusOK)
+}
+
+// GetMyBusinessMembership returns the caller's own admin status and location
+// roles within the business identified by businessId.
+//
+//	@Summary		Get my business membership
+//	@Description	Get the caller's own admin status and location roles within this business. Lets the frontend decide what admin-only or location-scoped UI to show, without probing each action individually.
+//	@Tags			businesses
+//	@Security		BearerAuth
+//	@Produce		json
+//	@Param			businessId	path		string	true	"Business ID"
+//	@Success		200			{object}	MyBusinessMembershipResponse
+//	@Failure		401			{object}	response.errorResponse
+//	@Failure		403			{object}	response.errorResponse
+//	@Router			/businesses/{businessId}/members/me [get]
+func (h *BusinessHandler) GetMyBusinessMembership(w http.ResponseWriter, r *http.Request) {
+	m, err := h.businessService.GetMyBusinessMembership(r.Context())
+	if err != nil {
+		handleServiceError(w, err, "get my business membership")
+		return
+	}
+
+	roleDTOs := make([]MyLocationRoleDTO, 0, len(m.LocationRoles))
+	for _, lr := range m.LocationRoles {
+		roleDTOs = append(roleDTOs, MyLocationRoleDTO{LocationId: lr.LocationId, Role: lr.Role})
+	}
+
+	response.WriteJSON(w, MyBusinessMembershipResponse{
+		UserId:         ctxkeys.GetUserId(r.Context()),
+		IsAdmin:        m.IsAdmin,
+		IsPrimaryAdmin: m.IsPrimaryAdmin,
+		LocationRoles:  roleDTOs,
+	}, http.StatusOK)
 }
 
 // RenameBusiness updates the business's name.
@@ -326,6 +381,7 @@ func (h *BusinessHandler) SetupRoutes(r chi.Router) {
 
 			r.Route("/members", func(r chi.Router) {
 				r.Get("/", h.GetBusinessMemberDetails)
+				r.Get("/me", h.GetMyBusinessMembership)
 				r.Delete("/{userId}", h.RemoveUserFromBusiness)
 				r.Patch("/{userId}/admin", h.SetAdminForBusinessMember)
 			})

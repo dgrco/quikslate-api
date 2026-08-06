@@ -28,7 +28,10 @@ func ValidateInviteExpiration(expiresAt time.Time) error {
 
 type InviteRepository interface {
 	CreateInvite(ctx context.Context, tokenHash, email, businessId, locationId string, role LRole, expiresAt time.Time) (Invite, error)
+	GetInviteById(ctx context.Context, id string) (Invite, error)
 	GetInviteByTokenHash(ctx context.Context, tokenHash string) (Invite, error)
 	GetPendingInviteByEmailAndBusinessId(ctx context.Context, email, businessId string) (Invite, error)
 	MarkInviteAccepted(ctx context.Context, tokenHash string) error
+	GetPendingInvitesByLocationId(ctx context.Context, locationId string) ([]Invite, error)
+	DeleteInvite(ctx context.Context, id string) error
 }

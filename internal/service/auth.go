@@ -18,6 +18,7 @@ type AuthService struct {
 	jwtSecret string
 }
 
+// NewAuthService constructs an AuthService backed by repo, signing JWTs with jwtSecret.
 func NewAuthService(repo domain.Repo, jwtSecret string) *AuthService {
 	return &AuthService{
 		repo:      repo,
@@ -30,6 +31,8 @@ type AuthResult struct {
 	RefreshToken string `json:"refresh_token,omitempty"`
 }
 
+// Register creates a new user with a hashed password and issues an initial
+// access/refresh token pair for them.
 func (s *AuthService) Register(ctx context.Context, email, name, password string) (*AuthResult, error) {
 	// Normalize email
 	email = domain.NormalizeEmail(email)
@@ -54,6 +57,9 @@ func (s *AuthService) Register(ctx context.Context, email, name, password string
 	return s.generateTokens(ctx, s.repo, user.Id)
 }
 
+// Login verifies email/password credentials and, on success, issues a new
+// access/refresh token pair. Returns domain.ErrInvalidCredentials for both an
+// unknown email and a wrong password, so callers can't distinguish the two.
 func (s *AuthService) Login(ctx context.Context, email, password string) (*AuthResult, error) {
 	// Normalize email
 	email = domain.NormalizeEmail(email)
@@ -73,6 +79,10 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*AuthR
 	return s.generateTokens(ctx, s.repo, user.Id)
 }
 
+// Refresh rotates a refresh token: the presented token is looked up by its
+// hash, checked for expiry, and deleted, and a brand-new access/refresh pair
+// is issued in its place — all inside one transaction, so a crash mid-rotation
+// can't leave the caller with neither a valid old nor new token.
 func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthResult, error) {
 	hashedToken := hashToken(refreshToken)
 
@@ -116,6 +126,8 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthRe
 	return result, nil
 }
 
+// Logout revokes a refresh token by deleting its stored hash, so it can no
+// longer be used to mint new access tokens.
 func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
 	hashedToken := hashToken(refreshToken)
 	return s.repo.DeleteRefreshToken(ctx, hashedToken)
@@ -171,6 +183,10 @@ func hashToken(token string) string {
 
 // Authz
 
+// GetBusinessMemberAuthzContext fetches the caller's admin/primary-admin
+// status for businessId, fresh from the database. Called by
+// RequireBusinessMember on every request so role/admin changes take effect
+// immediately, instead of only after the caller's JWT expires.
 func (s *AuthService) GetBusinessMemberAuthzContext(
 	ctx context.Context,
 	userId,
@@ -183,6 +199,10 @@ func (s *AuthService) GetBusinessMemberAuthzContext(
 	return ac, nil
 }
 
+// GetLocationMemberAuthzContext fetches the caller's admin/primary-admin
+// status plus their role at locationId, fresh from the database. Called by
+// RequireLocationMember on every request; the underlying query also verifies
+// locationId actually belongs to businessId, failing the request otherwise.
 func (s *AuthService) GetLocationMemberAuthzContext(
 	ctx context.Context,
 	userId,

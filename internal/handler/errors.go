@@ -55,6 +55,11 @@ func handleServiceError(w http.ResponseWriter, err error, fnName string) {
 		return
 	}
 
+	if errors.Is(err, domain.ErrShiftOverlap) {
+		response.WriteError(w, ERR_SHIFT_OVERLAP, http.StatusConflict)
+		return
+	}
+
 	if errors.Is(err, domain.ErrLastAdminRemoval) {
 		response.WriteError(w, ERR_LAST_ADMIN_REMOVAL, http.StatusBadRequest)
 		return
@@ -75,5 +80,6 @@ const (
 	ERR_ALREADY_EXISTS        = "already exists"
 	ERR_INVALID_CREDENTIALS   = "invalid credentials"
 	ERR_INVALID_SHIFT_TIMES   = "invalid shift times"
+	ERR_SHIFT_OVERLAP         = "shift overlaps an existing shift for this user"
 	ERR_LAST_ADMIN_REMOVAL    = "cannot remove last admin"
 )

@@ -30,14 +30,20 @@ func NewLocationHandler(
 
 // Request Structures
 
+// Timezone is an IANA name (e.g. "America/New_York"). It's required on both
+// requests, not optional-with-a-default: updateLocationRequest is a full
+// replacement (see domain.LocationUpdate), so accepting an empty value here
+// would silently reset an existing location to UTC.
 type createLocationRequest struct {
-	Name    string  `json:"name"`
-	Address *string `json:"address"`
+	Name     string  `json:"name"`
+	Address  *string `json:"address"`
+	Timezone string  `json:"timezone"`
 }
 
 type updateLocationRequest struct {
-	Name    string  `json:"name"`
-	Address *string `json:"address"`
+	Name     string  `json:"name"`
+	Address  *string `json:"address"`
+	Timezone string  `json:"timezone"`
 }
 
 // Response Structures
@@ -76,7 +82,7 @@ func (h *LocationHandler) CreateLocation(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	l, err := h.locationService.CreateLocation(r.Context(), req.Name, req.Address)
+	l, err := h.locationService.CreateLocation(r.Context(), req.Name, req.Address, req.Timezone)
 	if err != nil {
 		handleServiceError(w, err, "create location")
 		return
@@ -133,10 +139,10 @@ func (h *LocationHandler) GetAllLocations(w http.ResponseWriter, r *http.Request
 	response.WriteJSON(w, MultipleLocationResponse{Locations: ls}, http.StatusOK)
 }
 
-// UpdateLocation fully replaces the name and address of the location identified by locationId.
+// UpdateLocation fully replaces the name, address, and timezone of the location identified by locationId.
 //
 //	@Summary		Update location
-//	@Description	Replace a location's name and address. Admin only.
+//	@Description	Replace a location's name, address, and timezone. Full replacement — every field is applied as given, so omitting timezone resets it. Admin only.
 //	@Tags			locations
 //	@Security		BearerAuth
 //	@Accept			json
@@ -164,8 +170,9 @@ func (h *LocationHandler) UpdateLocation(w http.ResponseWriter, r *http.Request)
 		r.Context(),
 		locationId,
 		domain.LocationUpdate{
-			Name:    req.Name,
-			Address: req.Address,
+			Name:     req.Name,
+			Address:  req.Address,
+			Timezone: req.Timezone,
 		},
 	); err != nil {
 		handleServiceError(w, err, "update location")

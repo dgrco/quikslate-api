@@ -20,6 +20,26 @@ func NewShiftService(repo domain.Repo) *ShiftService {
 	}
 }
 
+// checkNoOverlap returns domain.ErrShiftOverlap if userId already has a
+// non-cancelled shift overlapping [startTime, endTime). excludeShiftId skips
+// the shift being edited so it can't collide with itself.
+func checkNoOverlap(
+	ctx context.Context,
+	repo domain.Repo,
+	userId string,
+	startTime, endTime time.Time,
+	excludeShiftId *string,
+) error {
+	overlapping, err := repo.GetOverlappingShiftsForUser(ctx, userId, startTime, endTime, excludeShiftId)
+	if err != nil {
+		return err
+	}
+	if len(overlapping) > 0 {
+		return domain.ErrShiftOverlap
+	}
+	return nil
+}
+
 // Create a new Shift given locationId, positionId, status, startTime, and endTime
 // (Authorization: Admin, LocationLead, Manager)
 func (ss *ShiftService) CreateShift(
@@ -40,20 +60,29 @@ func (ss *ShiftService) CreateShift(
 		return domain.Shift{}, fmt.Errorf("failed to create shift: %w", err)
 	}
 
+	if err := domain.ValidateShiftCreateStatus(status, userId); err != nil {
+		return domain.Shift{}, fmt.Errorf("failed to create shift: %w", err)
+	}
+
+	if err := domain.ValidateShiftTimes(startTime, endTime); err != nil {
+		return domain.Shift{}, fmt.Errorf("failed to create shift: %w", err)
+	}
+
 	if userId != nil {
 		// check if userId belongs to businessId
 		bm, err := ss.repo.GetBusinessMember(ctx, *userId, ctxkeys.GetBusinessId(ctx))
 		if err != nil {
 			return domain.Shift{}, fmt.Errorf("failed to create shift: %w", err)
 		}
-		// check is the caller is permitted to assign a shift to the target userId
-		if err := checkCanActOnLocationRole(ctx, ss.repo, *userId, ctxkeys.GetLocationId(ctx), bm.BusinessId); err != nil {
+		// check the caller is permitted to assign a shift to the target userId,
+		// and that the target can actually see the schedule here
+		if err := checkCanAssignToUser(ctx, ss.repo, &bm, ctxkeys.GetLocationId(ctx)); err != nil {
 			return domain.Shift{}, fmt.Errorf("failed to create shift: %w", err)
 		}
-	}
-
-	if err := domain.ValidateShiftTimes(startTime, endTime); err != nil {
-		return domain.Shift{}, fmt.Errorf("failed to create shift: %w", err)
+		// Times are already validated above, so this window is well-formed.
+		if err := checkNoOverlap(ctx, ss.repo, *userId, startTime, endTime, nil); err != nil {
+			return domain.Shift{}, fmt.Errorf("failed to create shift: %w", err)
+		}
 	}
 
 	s, err := ss.repo.CreateShift(ctx, userId, locationId, positionId, status, startTime, endTime)
@@ -81,17 +110,34 @@ func (ss *ShiftService) GetShift(
 	return s, nil
 }
 
-// Get all Shifts by locationId
+// Get the Shifts at the session's location overlapping [from, to), joined
+// with assignee and position names.
 // (Authorization: All - location scoped)
 func (ss *ShiftService) GetShiftsByLocation(
 	ctx context.Context,
-) ([]domain.Shift, error) {
+	from, to time.Time,
+) ([]domain.ShiftDetail, error) {
 	locationId, err := requireLocationRole(ctx, domain.Manager, domain.LocationLead, domain.Employee)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get shifts by location: %w", err)
 	}
 
-	shifts, err := ss.repo.GetShiftsByLocationId(ctx, locationId)
+	if err := domain.ValidateShiftRange(from, to); err != nil {
+		return nil, fmt.Errorf("failed to get shifts by location: %w", err)
+	}
+
+	// Employees get the published schedule: who is actually working. Drafts
+	// and unfilled slots are the work of *making* that schedule, and belong to
+	// whoever is making it. A draft is an unpublished plan — and since it can
+	// carry a user_id, showing it would tell someone they're pencilled in
+	// before anyone decided. An uncovered shift is an unsolved gap, which
+	// becomes staff-facing only once there's a flow for picking one up.
+	callerRole := resolveCallerRole(ctx)
+	managerView := callerRole == domain.Admin ||
+		callerRole == domain.LocationLead ||
+		callerRole == domain.Manager
+
+	shifts, err := ss.repo.GetShiftDetailsByLocationId(ctx, locationId, from, to, managerView)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get shifts by location: %w", err)
 	}
@@ -124,6 +170,20 @@ func (ss *ShiftService) UpdateShift(
 		}
 	}
 
+	if shiftUpdate.Status != nil {
+		if err := domain.ValidateShiftUpdateStatus(*shiftUpdate.Status); err != nil {
+			return fmt.Errorf("failed to update shift: %w", err)
+		}
+	}
+
+	// A shift can be moved between positions, but only to one in the caller's
+	// own business.
+	if shiftUpdate.PositionId != nil {
+		if _, err := getAndValidatePosition(ctx, ss.repo, *shiftUpdate.PositionId); err != nil {
+			return fmt.Errorf("failed to update shift: %w", err)
+		}
+	}
+
 	// If both times are set, make sure start-time is before end-time
 	if shiftUpdate.StartTime != nil && shiftUpdate.EndTime != nil {
 		if err := domain.ValidateShiftTimes(*shiftUpdate.StartTime, *shiftUpdate.EndTime); err != nil {
@@ -142,6 +202,23 @@ func (ss *ShiftService) UpdateShift(
 		}
 	}
 
+	// Moving an assigned shift's times can push it onto another of that
+	// person's shifts, so re-check against the window it's moving *to* —
+	// falling back to the current value for whichever end isn't changing.
+	// Excludes this shift so it doesn't collide with its own old times.
+	if s.UserId != nil && (shiftUpdate.StartTime != nil || shiftUpdate.EndTime != nil) {
+		newStart, newEnd := s.StartTime, s.EndTime
+		if shiftUpdate.StartTime != nil {
+			newStart = *shiftUpdate.StartTime
+		}
+		if shiftUpdate.EndTime != nil {
+			newEnd = *shiftUpdate.EndTime
+		}
+		if err := checkNoOverlap(ctx, ss.repo, *s.UserId, newStart, newEnd, &shiftId); err != nil {
+			return fmt.Errorf("failed to update shift: %w", err)
+		}
+	}
+
 	if err := ss.repo.UpdateShiftById(ctx, shiftId, shiftUpdate); err != nil {
 		return fmt.Errorf("failed to update shift: %w", err)
 	}
@@ -156,7 +233,7 @@ func (ss *ShiftService) AssignShift(
 	shiftId,
 	userId string,
 ) error {
-	_, err := getAndValidateShift(ctx, ss.repo, shiftId)
+	s, err := getAndValidateShift(ctx, ss.repo, shiftId)
 	if err != nil {
 		return fmt.Errorf("failed to assign shift: %w", err)
 	}
@@ -170,8 +247,20 @@ func (ss *ShiftService) AssignShift(
 		return fmt.Errorf("failed to assign shift: %w", err)
 	}
 
-	// check is the caller is permitted to assign a shift to the target userId
-	if err := checkCanActOnLocationRole(ctx, ss.repo, userId, ctxkeys.GetLocationId(ctx), bm.BusinessId); err != nil {
+	// check the caller is permitted to assign a shift to the target userId,
+	// and that the target can actually see the schedule here
+	if err := checkCanAssignToUser(ctx, ss.repo, &bm, ctxkeys.GetLocationId(ctx)); err != nil {
+		return fmt.Errorf("failed to assign shift: %w", err)
+	}
+
+	// Exclude this shift, or assigning it to whoever already holds it would
+	// conflict with itself. That isn't hypothetical: a draft shift may be
+	// created with a user_id already set, and since PATCH refuses to set
+	// status "assigned" (ValidateShiftUpdateStatus), calling assign with that
+	// same user is the only way to promote the draft. Reassigning A -> B
+	// doesn't need this — the query filters on user_id, so a shift still held
+	// by A never matches B.
+	if err := checkNoOverlap(ctx, ss.repo, userId, s.StartTime, s.EndTime, &shiftId); err != nil {
 		return fmt.Errorf("failed to assign shift: %w", err)
 	}
 

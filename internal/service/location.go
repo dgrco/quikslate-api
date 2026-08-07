@@ -20,12 +20,14 @@ func NewLocationService(repo domain.Repo) *LocationService {
 }
 
 // Create a Location and associate it with a businessId.
-// The location must have a name, and it may optionally contain an address.
+// The location must have a name and an IANA timezone, and it may optionally
+// contain an address.
 // (Authorization: admin)
 func (ls *LocationService) CreateLocation(
 	ctx context.Context,
 	locationName string,
 	address *string, // optional
+	timezone string,
 ) (domain.Location, error) {
 	if err := validateIsAdmin(ctx); err != nil {
 		return domain.Location{}, fmt.Errorf("failed to create location: %w", err)
@@ -35,7 +37,11 @@ func (ls *LocationService) CreateLocation(
 		return domain.Location{}, fmt.Errorf("failed to create location: %w", err)
 	}
 
-	l, err := ls.repo.CreateLocation(ctx, ctxkeys.GetBusinessId(ctx), locationName, address)
+	if err := domain.ValidateTimezone(timezone); err != nil {
+		return domain.Location{}, fmt.Errorf("failed to create location: %w", err)
+	}
+
+	l, err := ls.repo.CreateLocation(ctx, ctxkeys.GetBusinessId(ctx), locationName, address, timezone)
 	if err != nil {
 		return domain.Location{}, fmt.Errorf("failed to create location: %w", err)
 	}
@@ -67,7 +73,7 @@ func (ls *LocationService) GetAllLocations(
 	return locations, nil
 }
 
-// Update a Location with locationId, replacing its name and address
+// Update a Location with locationId, replacing its name, address, and timezone
 // (Authorization: admin)
 func (ls *LocationService) UpdateLocation(
 	ctx context.Context,
@@ -78,6 +84,9 @@ func (ls *LocationService) UpdateLocation(
 		return fmt.Errorf("failed to update location: %w", err)
 	}
 	if err := domain.ValidateLocationName(update.Name); err != nil {
+		return fmt.Errorf("failed to update location: %w", err)
+	}
+	if err := domain.ValidateTimezone(update.Timezone); err != nil {
 		return fmt.Errorf("failed to update location: %w", err)
 	}
 

@@ -11,6 +11,7 @@ var (
 	ErrUnauthorized        = errors.New("unauthorized")
 	ErrForbidden           = errors.New("forbidden")
 	ErrInvalidShiftTimes   = errors.New("invalid shift times")
+	ErrShiftOverlap        = errors.New("shift overlaps an existing shift for this user")
 	ErrLastAdminRemoval    = errors.New("cannot remove last admin")
 )
 

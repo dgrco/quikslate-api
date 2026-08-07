@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"slices"
 
 	"github.com/dgrco/quikslate/internal/ctxkeys"
@@ -151,6 +152,60 @@ func checkCanActOnLocationRole(ctx context.Context, repo domain.Repo, targetUser
 		return err
 	}
 	if !canActOnRole(ctxkeys.GetRole(ctx), targetRole.Role) {
+		return domain.ErrForbidden
+	}
+	return nil
+}
+
+// checkCanAssignToUser authorizes putting a shift on target at locationId.
+//
+// Beyond the role hierarchy this enforces something the hierarchy alone can't
+// express: the assignee has to be able to *see* the shift. Listing a
+// location's shifts requires a role there (or business-admin status), so
+// assigning someone without either produces a shift they're named on and
+// cannot view — a silently broken schedule rather than a rejected request.
+//
+// Self-assignment is always allowed. The caller has already cleared
+// requireLocationRole for this location, so they can see the shift by
+// definition, and putting yourself on a schedule isn't privilege escalation —
+// canActOnRole's strict-outranking rule exists to stop peers acting on each
+// other's *roles*, which is a different question.
+//
+// Use this only on the assignment paths (create-with-assignee, assign).
+// Unassign, cancel, and update deliberately keep checkCanActOnLocationRole:
+// when someone leaves and their role is revoked, their shifts still have to be
+// cleanable off the schedule.
+func checkCanAssignToUser(
+	ctx context.Context,
+	repo domain.Repo,
+	target *domain.BusinessMember,
+	locationId string,
+) error {
+	if target.UserId == ctxkeys.GetUserId(ctx) {
+		return nil
+	}
+
+	targetRole := domain.EmptyRole
+	lr, err := repo.GetLocationRole(ctx, target.UserId, locationId, target.BusinessId)
+	switch {
+	case err == nil:
+		targetRole = lr.Role
+	case errors.Is(err, domain.ErrNotFound):
+		// No role here. Only a business admin can still see this location's
+		// schedule, so for anyone else this is the invalid case above.
+		if !target.IsAdmin {
+			return domain.ErrForbidden
+		}
+	default:
+		return err
+	}
+
+	if ctxkeys.GetIsAdmin(ctx) {
+		return nil
+	}
+	// effectiveRole folds in the target's admin status, so a Manager can't
+	// assign a shift to a business admin by way of their empty location role.
+	if !canActOnRole(ctxkeys.GetRole(ctx), effectiveRole(target.IsAdmin, targetRole)) {
 		return domain.ErrForbidden
 	}
 	return nil

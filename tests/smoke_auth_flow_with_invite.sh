@@ -25,7 +25,7 @@ BUSINESS_ID=$(echo "$CREATE_RESP" | jq -r .business_id)
 echo "== create location =="
 LOCATION_RESP=$(curl -s -X POST "$BASE/businesses/$BUSINESS_ID/locations" \
   -H "Authorization: Bearer $ACCESS" -H "Content-Type: application/json" \
-  -d '{"name":"Test Location","address":"123 Main St"}')
+  -d '{"name":"Test Location","address":"123 Main St","timezone":"America/New_York"}')
 echo "$LOCATION_RESP" | jq .
 LOCATION_ID=$(echo "$LOCATION_RESP" | jq -r .location.id)
 [ "$LOCATION_ID" != "null" ] || { echo "FAILED: create location"; exit 1; }
@@ -50,7 +50,10 @@ curl -s -X POST "$BASE/businesses/$BUSINESS_ID/invites/$TOKEN/accept" \
   -H "Authorization: Bearer $INVITEE_ACCESS" | jq .
 
 echo "== confirm invitee actually has access now =="
-curl -s "$BASE/businesses/$BUSINESS_ID/locations/$LOCATION_ID/shifts" \
+SHIFT_FROM=$(date -u -d 'today 00:00' +%Y-%m-%dT%H:%M:%SZ)
+SHIFT_TO=$(date -u -d '+7 days' +%Y-%m-%dT%H:%M:%SZ)
+curl -s -G "$BASE/businesses/$BUSINESS_ID/locations/$LOCATION_ID/shifts" \
+  --data-urlencode "from=$SHIFT_FROM" --data-urlencode "to=$SHIFT_TO" \
   -H "Authorization: Bearer $INVITEE_ACCESS" | jq .
 
 echo "== look up invitee's user id directly from the db =="

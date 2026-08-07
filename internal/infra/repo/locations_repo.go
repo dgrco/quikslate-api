@@ -11,25 +11,25 @@ import (
 
 const (
 	createLocationQuery = `
-		INSERT INTO locations (business_id, name, address)
-		VALUES ($1, $2, $3)
-		RETURNING id, business_id, name, address, created_at, updated_at
+		INSERT INTO locations (business_id, name, address, timezone)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, business_id, name, address, timezone, created_at, updated_at
 	`
 	getLocationByIdQuery = `
-		SELECT id, business_id, name, address, created_at, updated_at
+		SELECT id, business_id, name, address, timezone, created_at, updated_at
 		FROM locations
 		WHERE id = $1
 	`
 	getLocationsByBusinessIdQuery = `
-		SELECT id, business_id, name, address, created_at, updated_at
+		SELECT id, business_id, name, address, timezone, created_at, updated_at
 		FROM locations
 		WHERE business_id = $1
 		ORDER BY created_at
 	`
 	updateLocationQuery = `
 		UPDATE locations
-		SET name = $1, address = $2, updated_at = NOW()
-		WHERE id = $3
+		SET name = $1, address = $2, timezone = $3, updated_at = NOW()
+		WHERE id = $4
 	`
 	deleteLocationQuery = `
 		DELETE FROM locations
@@ -45,6 +45,7 @@ func scanLocationFields(l *domain.Location, scan func(...any) error) error {
 		&l.BusinessId,
 		&l.Name,
 		&l.Address,
+		&l.Timezone,
 		&l.CreatedAt,
 		&l.UpdatedAt,
 	)
@@ -78,8 +79,8 @@ func scanLocations(rows pgx.Rows) ([]domain.Location, error) {
 }
 
 // CreateLocation inserts a new location under businessId and returns it.
-func (r *PgRepository) CreateLocation(ctx context.Context, businessId, name string, address *string) (domain.Location, error) {
-	l, err := scanLocation(r.exec.QueryRow(ctx, createLocationQuery, businessId, name, address))
+func (r *PgRepository) CreateLocation(ctx context.Context, businessId, name string, address *string, timezone string) (domain.Location, error) {
+	l, err := scanLocation(r.exec.QueryRow(ctx, createLocationQuery, businessId, name, address, timezone))
 	if err != nil {
 		return domain.Location{}, fmt.Errorf("failed to create location: %w", err)
 	}
@@ -120,10 +121,10 @@ func (r *PgRepository) GetLocationsByBusinessId(ctx context.Context, businessId 
 	return locations, nil
 }
 
-// UpdateLocationById overwrites a location's name and address, returning
-// domain.ErrNotFound if id doesn't match any row.
+// UpdateLocationById overwrites a location's name, address, and timezone,
+// returning domain.ErrNotFound if id doesn't match any row.
 func (r *PgRepository) UpdateLocationById(ctx context.Context, id string, update domain.LocationUpdate) error {
-	cmdTag, err := r.exec.Exec(ctx, updateLocationQuery, update.Name, update.Address, id)
+	cmdTag, err := r.exec.Exec(ctx, updateLocationQuery, update.Name, update.Address, update.Timezone, id)
 	if err != nil {
 		return fmt.Errorf("failed to update location: %w", err)
 	}

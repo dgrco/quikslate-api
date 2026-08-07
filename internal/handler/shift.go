@@ -40,9 +40,10 @@ type createShiftRequest struct {
 }
 
 type updateShiftRequest struct {
-	Status    *domain.ShiftStatus `json:"status"`
-	StartTime *time.Time          `json:"start_time"`
-	EndTime   *time.Time          `json:"end_time"`
+	Status     *domain.ShiftStatus `json:"status"`
+	PositionId *string             `json:"position_id"`
+	StartTime  *time.Time          `json:"start_time"`
+	EndTime    *time.Time          `json:"end_time"`
 }
 
 type assignShiftRequest struct {
@@ -56,7 +57,7 @@ type SingleShiftResponse struct {
 }
 
 type MultipleShiftResponse struct {
-	Shifts []domain.Shift `json:"shifts"`
+	Shifts []domain.ShiftDetail `json:"shifts"`
 }
 
 // Handlers
@@ -64,7 +65,7 @@ type MultipleShiftResponse struct {
 // CreateShift creates a new shift under the location identified by locationId.
 //
 //	@Summary		Create shift
-//	@Description	Create a new shift at a location, optionally pre-assigned to a user. Admin, Manager, or LocationLead.
+//	@Description	Create a new shift at a location, optionally pre-assigned to a user. Status must be "draft", "assigned" (requires user_id), or "uncovered" (requires no user_id). Returns 409 if a pre-assigned user already has an overlapping shift. Admin, Manager, or LocationLead. A pre-assigned user must be able to see the shift — they need a role at this location, or business-admin status.
 //	@Tags			shifts
 //	@Security		BearerAuth
 //	@Accept			json
@@ -76,6 +77,7 @@ type MultipleShiftResponse struct {
 //	@Failure		400			{object}	response.errorResponse
 //	@Failure		401			{object}	response.errorResponse
 //	@Failure		403			{object}	response.errorResponse
+//	@Failure		409			{object}	response.errorResponse
 //	@Router			/businesses/{businessId}/locations/{locationId}/shifts [post]
 func (h *ShiftHandler) CreateShift(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
@@ -129,21 +131,38 @@ func (h *ShiftHandler) GetShift(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, SingleShiftResponse{Shift: s}, http.StatusOK)
 }
 
-// GetShiftsByLocation returns every shift at the location identified by locationId.
+// GetShiftsByLocation returns the shifts at locationId overlapping the
+// requested time range.
 //
 //	@Summary		List shifts
-//	@Description	List all shifts at a location. Any member of the location (Admin, LocationLead, Manager, or Employee).
+//	@Description	List the shifts at a location overlapping [from, to), joined with the assignee's and position's names. Both range params are required — there is no unbounded listing — and the range may not exceed 90 days. Cancelled shifts are included. Draft and uncovered shifts are returned only to Admin, LocationLead, and Manager — an unpublished plan and an unfilled slot are both part of building a schedule rather than reading one, so Employees see neither. Any member of the location may call this.
 //	@Tags			shifts
 //	@Security		BearerAuth
 //	@Produce		json
 //	@Param			businessId	path		string	true	"Business ID"
 //	@Param			locationId	path		string	true	"Location ID"
+//	@Param			from		query		string	true	"Range start, RFC3339 (inclusive)"
+//	@Param			to			query		string	true	"Range end, RFC3339 (exclusive)"
 //	@Success		200			{object}	MultipleShiftResponse
+//	@Failure		400			{object}	response.errorResponse
 //	@Failure		401			{object}	response.errorResponse
 //	@Failure		403			{object}	response.errorResponse
 //	@Router			/businesses/{businessId}/locations/{locationId}/shifts [get]
 func (h *ShiftHandler) GetShiftsByLocation(w http.ResponseWriter, r *http.Request) {
-	ss, err := h.shiftService.GetShiftsByLocation(r.Context())
+	// Both params are required rather than defaulting to "all time": a
+	// forgotten param should be a loud 400, not a silent full-history dump.
+	from, err := time.Parse(time.RFC3339, r.URL.Query().Get("from"))
+	if err != nil {
+		response.WriteError(w, "'from' must be an RFC3339 timestamp", http.StatusBadRequest)
+		return
+	}
+	to, err := time.Parse(time.RFC3339, r.URL.Query().Get("to"))
+	if err != nil {
+		response.WriteError(w, "'to' must be an RFC3339 timestamp", http.StatusBadRequest)
+		return
+	}
+
+	ss, err := h.shiftService.GetShiftsByLocation(r.Context(), from, to)
 	if err != nil {
 		handleServiceError(w, err, "get shifts by location")
 		return
@@ -155,7 +174,7 @@ func (h *ShiftHandler) GetShiftsByLocation(w http.ResponseWriter, r *http.Reques
 // UpdateShift partially updates the shift identified by shiftId.
 //
 //	@Summary		Update shift
-//	@Description	Partially update a shift's status, start_time, and/or end_time. Admin, Manager, or LocationLead; if the shift is assigned, caller must be authorized to act on the assigned user's role (see canActOnRole).
+//	@Description	Partially update a shift's status, position_id, start_time, and/or end_time. Status cannot be set to "assigned" or "cancelled" here — use the dedicated /assign and /cancel endpoints. Moving an assigned shift's times returns 409 if it would overlap another of that user's shifts. Admin, Manager, or LocationLead; if the shift is assigned, caller must be authorized to act on the assigned user's role (see canActOnRole).
 //	@Tags			shifts
 //	@Security		BearerAuth
 //	@Accept			json
@@ -168,6 +187,7 @@ func (h *ShiftHandler) GetShiftsByLocation(w http.ResponseWriter, r *http.Reques
 //	@Failure		400			{object}	response.errorResponse
 //	@Failure		401			{object}	response.errorResponse
 //	@Failure		403			{object}	response.errorResponse
+//	@Failure		409			{object}	response.errorResponse
 //	@Router			/businesses/{businessId}/locations/{locationId}/shifts/{shiftId} [patch]
 func (h *ShiftHandler) UpdateShift(w http.ResponseWriter, r *http.Request) {
 	shiftId := chi.URLParam(r, "shiftId")
@@ -181,9 +201,10 @@ func (h *ShiftHandler) UpdateShift(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.shiftService.UpdateShift(r.Context(), shiftId, domain.ShiftUpdate{
-		Status:    req.Status,
-		StartTime: req.StartTime,
-		EndTime:   req.EndTime,
+		Status:     req.Status,
+		PositionId: req.PositionId,
+		StartTime:  req.StartTime,
+		EndTime:    req.EndTime,
 	}); err != nil {
 		handleServiceError(w, err, "update shift")
 		return
@@ -195,7 +216,7 @@ func (h *ShiftHandler) UpdateShift(w http.ResponseWriter, r *http.Request) {
 // AssignShift assigns the shift identified by shiftId to a target user.
 //
 //	@Summary		Assign shift
-//	@Description	Assign a shift to a user. Admin, Manager, or LocationLead; caller must be authorized to act on the target user's role (see canActOnRole).
+//	@Description	Assign a shift to a user and set its status to "assigned". Returns 409 if the user already has an overlapping shift. Admin, Manager, or LocationLead. The target must be able to see the shift — they need a role at this location, or business-admin status — and the caller must outrank them (see canActOnRole), except when assigning to themselves.
 //	@Tags			shifts
 //	@Security		BearerAuth
 //	@Accept			json
@@ -208,6 +229,7 @@ func (h *ShiftHandler) UpdateShift(w http.ResponseWriter, r *http.Request) {
 //	@Failure		400			{object}	response.errorResponse
 //	@Failure		401			{object}	response.errorResponse
 //	@Failure		403			{object}	response.errorResponse
+//	@Failure		409			{object}	response.errorResponse
 //	@Router			/businesses/{businessId}/locations/{locationId}/shifts/{shiftId}/assign [patch]
 func (h *ShiftHandler) AssignShift(w http.ResponseWriter, r *http.Request) {
 	shiftId := chi.URLParam(r, "shiftId")

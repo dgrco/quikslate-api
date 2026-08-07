@@ -26,10 +26,33 @@ const (
 		FROM shifts
 		WHERE id = $1
 	`
-	getShiftsByLocationIdQuery = `
+	// LEFT JOIN on users because an unassigned shift has a NULL user_id — an
+	// inner join would silently drop exactly the open shifts a scheduler most
+	// needs to see. u.email is deliberately absent (see domain.ShiftDetail).
+	getShiftDetailsByLocationIdQuery = `
+		SELECT s.id, s.user_id, u.name, s.location_id, s.position_id, p.name,
+		       s.status, s.start_time, s.end_time, s.created_at, s.updated_at
+		FROM shifts s
+		JOIN positions p ON p.id = s.position_id
+		LEFT JOIN users u ON u.id = s.user_id
+		WHERE s.location_id = $1
+		  AND s.start_time < $3
+		  AND s.end_time > $2
+		  AND ($4 OR s.status NOT IN ('draft', 'uncovered'))
+		ORDER BY s.start_time
+	`
+	// $4 is the shift to exclude, or NULL to exclude nothing — folding both
+	// cases into one query rather than building SQL conditionally.
+	// Cancelled shifts are excluded: a cancelled shift isn't a real booking,
+	// so it must not block scheduling someone back into that slot.
+	getOverlappingShiftsForUserQuery = `
 		SELECT id, user_id, location_id, position_id, status, start_time, end_time, created_at, updated_at
 		FROM shifts
-		WHERE location_id = $1
+		WHERE user_id = $1
+		  AND status <> 'cancelled'
+		  AND start_time < $3
+		  AND end_time > $2
+		  AND ($4::uuid IS NULL OR id <> $4::uuid)
 	`
 	unassignShiftQuery = `
 		UPDATE shifts
@@ -90,6 +113,36 @@ func scanShifts(rows pgx.Rows) ([]domain.Shift, error) {
 	return shifts, nil
 }
 
+// scanShiftDetails scans every remaining row into a slice of
+// domain.ShiftDetail. Column order must match getShiftDetailsByLocationIdQuery.
+func scanShiftDetails(rows pgx.Rows) ([]domain.ShiftDetail, error) {
+	details := []domain.ShiftDetail{}
+	for rows.Next() {
+		var d domain.ShiftDetail
+		err := rows.Scan(
+			&d.Id,
+			&d.UserId,
+			&d.UserName,
+			&d.LocationId,
+			&d.PositionId,
+			&d.PositionName,
+			&d.Status,
+			&d.StartTime,
+			&d.EndTime,
+			&d.CreatedAt,
+			&d.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan shift detail: %w", err)
+		}
+		details = append(details, d)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate shift details: %w", err)
+	}
+	return details, nil
+}
+
 // CreateShift inserts a new shift at locationId for positionId, optionally
 // pre-assigned to userId, and returns it.
 func (r *PgRepository) CreateShift(
@@ -121,18 +174,50 @@ func (r *PgRepository) GetShiftById(ctx context.Context, id string) (domain.Shif
 	return s, nil
 }
 
-// GetShiftsByLocationId returns every shift (any status, assigned or not) at
-// locationId.
-func (r *PgRepository) GetShiftsByLocationId(ctx context.Context, locationId string) ([]domain.Shift, error) {
-	rows, err := r.exec.Query(ctx, getShiftsByLocationIdQuery, locationId)
+// GetShiftDetailsByLocationId returns the shifts at locationId overlapping
+// [from, to), joined with the assignee's and position's names, oldest start
+// first. Cancelled shifts are included — the caller decides how to present
+// them, and hiding them here would make a cancellation look like a deletion.
+func (r *PgRepository) GetShiftDetailsByLocationId(
+	ctx context.Context,
+	locationId string,
+	from, to time.Time,
+	managerView bool,
+) ([]domain.ShiftDetail, error) {
+	rows, err := r.exec.Query(ctx, getShiftDetailsByLocationIdQuery, locationId, from, to, managerView)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get shifts by location ID: %w", err)
+		return nil, fmt.Errorf("failed to get shift details by location ID: %w", err)
+	}
+	defer rows.Close()
+
+	details, err := scanShiftDetails(rows)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get shift details by location ID: %w", err)
+	}
+
+	return details, nil
+}
+
+// GetOverlappingShiftsForUser returns userId's non-cancelled shifts
+// overlapping [from, to), optionally excluding one shift by id so an edit
+// doesn't conflict with the shift being edited. Note this spans every
+// location in every business — a person can't be in two places at once, and
+// the caller has already been authorized against the shift they're acting on.
+func (r *PgRepository) GetOverlappingShiftsForUser(
+	ctx context.Context,
+	userId string,
+	from, to time.Time,
+	excludeShiftId *string,
+) ([]domain.Shift, error) {
+	rows, err := r.exec.Query(ctx, getOverlappingShiftsForUserQuery, userId, from, to, excludeShiftId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get overlapping shifts for user: %w", err)
 	}
 	defer rows.Close()
 
 	shifts, err := scanShifts(rows)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get shifts by location ID: %w", err)
+		return nil, fmt.Errorf("failed to get overlapping shifts for user: %w", err)
 	}
 
 	return shifts, nil
@@ -145,6 +230,9 @@ func (r *PgRepository) UpdateShiftById(ctx context.Context, id string, update do
 	builder := newUpdateBuilder()
 	if update.Status != nil {
 		builder.Add("status", *update.Status)
+	}
+	if update.PositionId != nil {
+		builder.Add("position_id", *update.PositionId)
 	}
 	if update.StartTime != nil {
 		builder.Add("start_time", *update.StartTime)

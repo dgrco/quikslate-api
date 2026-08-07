@@ -848,7 +848,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Replace a location's name and address. Admin only.",
+                "description": "Replace a location's name, address, and timezone. Full replacement — every field is applied as given, so omitting timezone resets it. Admin only.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1406,7 +1406,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "List all shifts at a location. Any member of the location (Admin, LocationLead, Manager, or Employee).",
+                "description": "List the shifts at a location overlapping [from, to), joined with the assignee's and position's names. Both range params are required — there is no unbounded listing — and the range may not exceed 90 days. Cancelled shifts are included. Draft and uncovered shifts are returned only to Admin, LocationLead, and Manager — an unpublished plan and an unfilled slot are both part of building a schedule rather than reading one, so Employees see neither. Any member of the location may call this.",
                 "produces": [
                     "application/json"
                 ],
@@ -1428,6 +1428,20 @@ const docTemplate = `{
                         "name": "locationId",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Range start, RFC3339 (inclusive)",
+                        "name": "from",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Range end, RFC3339 (exclusive)",
+                        "name": "to",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1435,6 +1449,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/internal_handler.MultipleShiftResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
                         }
                     },
                     "401": {
@@ -1457,7 +1477,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Create a new shift at a location, optionally pre-assigned to a user. Admin, Manager, or LocationLead.",
+                "description": "Create a new shift at a location, optionally pre-assigned to a user. Status must be \"draft\", \"assigned\" (requires user_id), or \"uncovered\" (requires no user_id). Returns 409 if a pre-assigned user already has an overlapping shift. Admin, Manager, or LocationLead. A pre-assigned user must be able to see the shift — they need a role at this location, or business-admin status.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1514,6 +1534,12 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
                         }
@@ -1650,7 +1676,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Partially update a shift's status, start_time, and/or end_time. Admin, Manager, or LocationLead; if the shift is assigned, caller must be authorized to act on the assigned user's role (see canActOnRole).",
+                "description": "Partially update a shift's status, position_id, start_time, and/or end_time. Status cannot be set to \"assigned\" or \"cancelled\" here — use the dedicated /assign and /cancel endpoints. Moving an assigned shift's times returns 409 if it would overlap another of that user's shifts. Admin, Manager, or LocationLead; if the shift is assigned, caller must be authorized to act on the assigned user's role (see canActOnRole).",
                 "consumes": [
                     "application/json"
                 ],
@@ -1717,6 +1743,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
                         }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
                     }
                 }
             }
@@ -1728,7 +1760,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Assign a shift to a user. Admin, Manager, or LocationLead; caller must be authorized to act on the target user's role (see canActOnRole).",
+                "description": "Assign a shift to a user and set its status to \"assigned\". Returns 409 if the user already has an overlapping shift. Admin, Manager, or LocationLead. The target must be able to see the shift — they need a role at this location, or business-admin status — and the caller must outrank them (see canActOnRole), except when assigning to themselves.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1792,6 +1824,12 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
                         }
@@ -2488,6 +2526,9 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "timezone": {
+                    "type": "string"
+                },
                 "updated_at": {
                     "type": "string"
                 }
@@ -2541,6 +2582,44 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_dgrco_quikslate_internal_domain.ShiftDetail": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "location_id": {
+                    "type": "string"
+                },
+                "position_id": {
+                    "type": "string"
+                },
+                "position_name": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/github_com_dgrco_quikslate_internal_domain.ShiftStatus"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                },
+                "user_name": {
                     "type": "string"
                 }
             }
@@ -2769,7 +2848,7 @@ const docTemplate = `{
                 "shifts": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_dgrco_quikslate_internal_domain.Shift"
+                        "$ref": "#/definitions/github_com_dgrco_quikslate_internal_domain.ShiftDetail"
                     }
                 }
             }
@@ -2919,6 +2998,9 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "timezone": {
+                    "type": "string"
                 }
             }
         },
@@ -3007,6 +3089,9 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "timezone": {
+                    "type": "string"
                 }
             }
         },
@@ -3014,6 +3099,9 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "end_time": {
+                    "type": "string"
+                },
+                "position_id": {
                     "type": "string"
                 },
                 "start_time": {

@@ -24,7 +24,7 @@ import (
 // @title						QuikSlate API
 // @version					1.0
 // @description				Scheduling API for businesses, locations, positions, shifts, and employees.
-// @BasePath					/
+// @BasePath					/v1
 // @securityDefinitions.apikey	BearerAuth
 // @in							header
 // @name						Authorization
@@ -82,21 +82,35 @@ func main() {
 	}))
 
 	// Route Setup
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hi from Quikslate :)"))
+	//
+	// Everything the API serves lives under /v1. In production a single
+	// origin serves both halves of the app: the reverse proxy sends /v1/* to
+	// this server and every other path to the frontend, so the prefix is what
+	// keeps API routes from colliding with the app's own routes, and it lets
+	// that proxy rule stay fixed as new resources are added.
+	//
+	// The refresh token cookie's Path is scoped to match this prefix (see
+	// setRefreshTokenCookie in internal/handler/auth.go). Changing the prefix
+	// here without changing it there means the browser silently stops sending
+	// the cookie, which looks like every session dying on reload rather than
+	// like a routing change.
+	r.Route("/v1", func(r chi.Router) {
+		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte("Hi from Quikslate :)"))
+		})
+
+		// Swagger UI + spec, served at /v1/swagger/index.html
+		r.Get("/swagger/*", httpSwagger.WrapHandler)
+
+		authHandler.SetupRoutes(r)
+		businessHandler.SetupRoutes(r)
+		locationHandler.SetupRoutes(r)
+		inviteHandler.SetupRoutes(r)
+		positionHandler.SetupRoutes(r)
+		shiftHandler.SetupRoutes(r)
+		employeeHandler.SetupRoutes(r)
+		locationRoleHandler.SetupRoutes(r)
 	})
-
-	// Swagger UI + spec, served at /swagger/index.html
-	r.Get("/swagger/*", httpSwagger.WrapHandler)
-
-	authHandler.SetupRoutes(r)
-	businessHandler.SetupRoutes(r)
-	locationHandler.SetupRoutes(r)
-	inviteHandler.SetupRoutes(r)
-	positionHandler.SetupRoutes(r)
-	shiftHandler.SetupRoutes(r)
-	employeeHandler.SetupRoutes(r)
-	locationRoleHandler.SetupRoutes(r)
 
 	// Listen
 	log.Printf("Server started on port %s", cfg.ApiPort)

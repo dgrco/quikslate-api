@@ -214,7 +214,12 @@ func setRefreshTokenCookie(w http.ResponseWriter, token string, secure bool) {
 		Value:    token,
 		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
-		Path:     "/auth",
+		// Matched against the path the browser requests, not the path this
+		// router sees internally, so it carries the /v1 prefix the routes are
+		// mounted under (cmd/server/main.go). Scoped to /auth beneath it so
+		// the cookie rides along only on the two endpoints that consume it,
+		// refresh and logout, rather than on every API call.
+		Path:     "/v1/auth",
 		MaxAge:   30 * 24 * 60 * 60, // 30 days
 		HttpOnly: true,
 	})

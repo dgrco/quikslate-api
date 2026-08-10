@@ -8,6 +8,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// employee_positions_repo.go implements domain.EmployeePositionRepository:
+// managing which positions a user is qualified to work, via the
+// employee_positions join table.
+
 const (
 	addPositionQuery = `
 		INSERT INTO employee_positions (user_id, position_id)

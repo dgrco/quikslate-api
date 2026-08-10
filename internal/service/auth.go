@@ -13,6 +13,10 @@ import (
 	"github.com/dgrco/quikslate/internal/domain"
 )
 
+// AuthService implements registration, login, refresh-token rotation, and
+// logout, plus the authorization-context lookups the auth middleware calls
+// on every request. See api/CLAUDE.md for the full auth model.
+
 type AuthService struct {
 	repo      domain.Repo
 	jwtSecret string
@@ -81,7 +85,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*AuthR
 
 // Refresh rotates a refresh token: the presented token is looked up by its
 // hash, checked for expiry, and deleted, and a brand-new access/refresh pair
-// is issued in its place — all inside one transaction, so a crash mid-rotation
+// is issued in its place, all inside one transaction, so a crash mid-rotation
 // can't leave the caller with neither a valid old nor new token.
 func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthResult, error) {
 	hashedToken := hashToken(refreshToken)

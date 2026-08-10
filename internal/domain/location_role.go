@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+// LocationRole is the role a business member holds at one specific
+// location. It is what internal/service/authorization_checks.go checks for
+// location-scoped actions; business admins bypass it entirely, see the
+// Admin constant below.
+
 type LRole string
 
 const (
@@ -31,7 +36,7 @@ type LocationRole struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
-// LocationRoleDetail is a LocationRole joined with its user's name/email —
+// LocationRoleDetail is a LocationRole joined with its user's name/email,
 // the shape a location's roster actually needs to display.
 type LocationRoleDetail struct {
 	UserId     string    `json:"user_id"`
@@ -47,7 +52,7 @@ type LocationRoleDetail struct {
 // ValidateNonAdminLocationRole returns an error unless role is one of the
 // three real location_roles enum values (Manager, Employee, LocationLead).
 // Use this where EmptyRole and Admin (which have no location_roles row)
-// would be meaningless — e.g. when assigning someone a role at a location.
+// would be meaningless, e.g. when assigning someone a role at a location.
 func ValidateNonAdminLocationRole(role LRole) error {
 	switch role {
 	case Manager, Employee, LocationLead:
@@ -59,7 +64,7 @@ func ValidateNonAdminLocationRole(role LRole) error {
 
 // ValidateLocationRole returns an error unless role is a real location_roles
 // enum value or EmptyRole. Unlike ValidateNonAdminLocationRole, it accepts
-// EmptyRole — use this where "no role at this location" is a legitimate
+// EmptyRole, use this where "no role at this location" is a legitimate
 // value, not just an absence.
 func ValidateLocationRole(role LRole) error {
 	switch role {

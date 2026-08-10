@@ -55,7 +55,7 @@ func GetIsPrimaryAdmin(ctx context.Context) bool {
 }
 
 // GetRole returns the caller's role at their session location, as set by
-// RequireLocationMember. Returns domain.EmptyRole if unset — which is
+// RequireLocationMember. Returns domain.EmptyRole if unset, which is
 // ambiguous between "not under RequireLocationMember at all" and "a
 // non-admin genuinely has no role here"; see resolveCallerRole in
 // internal/service/authorization_checks.go for the caller-side disambiguation.

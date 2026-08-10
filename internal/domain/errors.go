@@ -2,6 +2,9 @@ package domain
 
 import "errors"
 
+// Sentinel errors and the ValidationError type that internal/service returns
+// and internal/handler/errors.go translates into HTTP responses.
+
 // General Errors
 var (
 	ErrNotFound            = errors.New("not found")

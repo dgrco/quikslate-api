@@ -9,6 +9,11 @@ import (
 	"github.com/dgrco/quikslate/internal/domain"
 )
 
+// ShiftService manages the schedule: creating, updating, assigning, and
+// cancelling shifts at a location. Every method here is location-scoped,
+// so it requires a session under RequireLocationMember (see
+// api/CLAUDE.md), unlike most other services which are business-scoped.
+
 type ShiftService struct {
 	repo domain.Repo
 }
@@ -40,8 +45,8 @@ func checkNoOverlap(
 	return nil
 }
 
-// Create a new Shift given locationId, positionId, status, startTime, and endTime
-// (Authorization: Admin, LocationLead, Manager)
+// CreateShift creates a shift at the caller's session location, optionally
+// pre-assigned to userId. Authorization: Admin, LocationLead, Manager.
 func (ss *ShiftService) CreateShift(
 	ctx context.Context,
 	positionId string,
@@ -93,8 +98,8 @@ func (ss *ShiftService) CreateShift(
 	return s, nil
 }
 
-// Get a Shift by shiftId
-// (Authorization: All - location scoped)
+// GetShift returns shiftId's details. Authorization: any role at that
+// location (Admin, LocationLead, Manager, Employee).
 func (ss *ShiftService) GetShift(
 	ctx context.Context,
 	shiftId string,
@@ -110,9 +115,9 @@ func (ss *ShiftService) GetShift(
 	return s, nil
 }
 
-// Get the Shifts at the session's location overlapping [from, to), joined
-// with assignee and position names.
-// (Authorization: All - location scoped)
+// GetShiftsByLocation returns the shifts at the session's location
+// overlapping [from, to), joined with assignee and position names.
+// Authorization: any role at that location.
 func (ss *ShiftService) GetShiftsByLocation(
 	ctx context.Context,
 	from, to time.Time,
@@ -128,7 +133,7 @@ func (ss *ShiftService) GetShiftsByLocation(
 
 	// Employees get the published schedule: who is actually working. Drafts
 	// and unfilled slots are the work of *making* that schedule, and belong to
-	// whoever is making it. A draft is an unpublished plan — and since it can
+	// whoever is making it. A draft is an unpublished plan, and since it can
 	// carry a user_id, showing it would tell someone they're pencilled in
 	// before anyone decided. An uncovered shift is an unsolved gap, which
 	// becomes staff-facing only once there's a flow for picking one up.
@@ -145,9 +150,9 @@ func (ss *ShiftService) GetShiftsByLocation(
 	return shifts, nil
 }
 
-// Update Shift by shiftId using a ShiftUpdate object
-// This includes updating any of: status, start time, and/or end time.
-// (Authorization: Admin, LocationLead, Manager)
+// UpdateShift applies a partial update (status, position, start/end time)
+// to shiftId. Authorization: Admin, LocationLead, Manager, and the caller
+// must outrank the shift's current assignee if it has one.
 func (ss *ShiftService) UpdateShift(
 	ctx context.Context,
 	shiftId string,
@@ -203,7 +208,7 @@ func (ss *ShiftService) UpdateShift(
 	}
 
 	// Moving an assigned shift's times can push it onto another of that
-	// person's shifts, so re-check against the window it's moving *to* —
+	// person's shifts, so re-check against the window it's moving *to*,
 	// falling back to the current value for whichever end isn't changing.
 	// Excludes this shift so it doesn't collide with its own old times.
 	if s.UserId != nil && (shiftUpdate.StartTime != nil || shiftUpdate.EndTime != nil) {
@@ -226,8 +231,8 @@ func (ss *ShiftService) UpdateShift(
 	return nil
 }
 
-// Assign an existing Shift to a target userId
-// (Authorization: Admin, LocationLead, Manager)
+// AssignShift puts userId on shiftId. Authorization: Admin, LocationLead,
+// Manager; see checkCanAssignToUser for the extra assignment-specific rule.
 func (ss *ShiftService) AssignShift(
 	ctx context.Context,
 	shiftId,
@@ -258,7 +263,7 @@ func (ss *ShiftService) AssignShift(
 	// created with a user_id already set, and since PATCH refuses to set
 	// status "assigned" (ValidateShiftUpdateStatus), calling assign with that
 	// same user is the only way to promote the draft. Reassigning A -> B
-	// doesn't need this — the query filters on user_id, so a shift still held
+	// doesn't need this: the query filters on user_id, so a shift still held
 	// by A never matches B.
 	if err := checkNoOverlap(ctx, ss.repo, userId, s.StartTime, s.EndTime, &shiftId); err != nil {
 		return fmt.Errorf("failed to assign shift: %w", err)
@@ -271,8 +276,8 @@ func (ss *ShiftService) AssignShift(
 	return nil
 }
 
-// Unassign a Shift by its shiftId
-// (Authorization: Admin, LocationLead, Manager)
+// UnassignShift clears shiftId's assignee, leaving the shift itself intact.
+// Authorization: Admin, LocationLead, Manager.
 func (ss *ShiftService) UnassignShift(
 	ctx context.Context,
 	shiftId string,
@@ -301,8 +306,8 @@ func (ss *ShiftService) UnassignShift(
 	return nil
 }
 
-// Cancel (or soft-delete) a Shift by its shiftId
-// (Authorization: Admin, LocationLead, Manager)
+// CancelShift soft-deletes shiftId by marking it Cancelled; the row stays
+// in the schedule's history. Authorization: Admin, LocationLead, Manager.
 func (ss *ShiftService) CancelShift(
 	ctx context.Context,
 	shiftId string,
@@ -330,8 +335,8 @@ func (ss *ShiftService) CancelShift(
 	return nil
 }
 
-// (Hard-) Delete a Shift by its shiftId
-// (Authorization: Admin)
+// DeleteShift permanently removes shiftId, unlike CancelShift's soft
+// delete. Authorization: Admin only.
 func (ss *ShiftService) DeleteShift(
 	ctx context.Context,
 	shiftId string,

@@ -9,6 +9,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// businesses_repo.go implements domain.BusinessRepository: CRUD for the
+// businesses table, the top-level tenant every location, position, and
+// shift belongs to.
+
 const (
 	createBusinessQuery = `
 		INSERT INTO businesses (name)
@@ -80,7 +84,6 @@ func (r *PgRepository) GetBusinessById(ctx context.Context, id string) (domain.B
 // join through business_members. Returns an empty slice, not an error, if
 // they're a member of none.
 func (r *PgRepository) GetBusinessesByUserId(ctx context.Context, userId string) ([]domain.Business, error) {
-	// In the future I may separate this into a separate function like the rest
 	rows, err := r.exec.Query(ctx, getBusinessesByUserIdQuery, userId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get businesses by user ID: %w", err)

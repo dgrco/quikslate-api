@@ -10,6 +10,10 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// positions_repo.go implements domain.PositionRepository: CRUD for
+// positions, the job roles (e.g. "cashier") that shifts and employee
+// qualifications reference.
+
 const (
 	createPositionQuery = `
 		INSERT INTO positions (business_id, name)
@@ -92,7 +96,7 @@ func (r *PgRepository) CreatePosition(ctx context.Context, businessId, name stri
 
 // GetPositionById fetches a position by id, returning domain.ErrNotFound if
 // no such position exists. Callers that need to enforce it belongs to a
-// particular business must check the returned BusinessId themselves — this
+// particular business must check the returned BusinessId themselves; this
 // does no business-scoping on its own.
 func (r *PgRepository) GetPositionById(ctx context.Context, id string) (domain.Position, error) {
 	p, err := scanPosition(r.exec.QueryRow(ctx, getPositionByIdQuery, id))

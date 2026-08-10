@@ -7,7 +7,11 @@ import (
 	"time"
 )
 
-const EmptyLocation = "" // for admins
+// Location is a physical site belonging to a Business, where positions are
+// offered and shifts are scheduled. Its timezone drives how that site's
+// shift times are interpreted and displayed.
+
+const EmptyLocation = "" // for admins, who are not scoped to a single location
 
 type Location struct {
 	Id         string    `json:"id"`
@@ -41,7 +45,7 @@ func ValidateTimezone(timezone string) error {
 	return nil
 }
 
-// LocationUpdate is a full replacement of a location's mutable fields —
+// LocationUpdate is a full replacement of a location's mutable fields:
 // there is no partial-update path, so every field is always applied as given.
 type LocationUpdate struct {
 	Name     string

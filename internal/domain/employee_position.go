@@ -2,6 +2,10 @@ package domain
 
 import "context"
 
+// EmployeePosition links a user to a position they are qualified to work
+// (e.g. "cashier", "cook") within a business, independent of which location
+// they are scheduled at.
+
 type EmployeePosition struct {
 	UserId     string `json:"user_id"`
 	PositionId string `json:"position_id"`

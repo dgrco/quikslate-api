@@ -15,6 +15,10 @@ import (
 	"github.com/go-chi/httprate"
 )
 
+// This file implements the auth handler: registration, login, refresh-token
+// rotation, and logout, plus the HttpOnly refresh_token cookie helper shared
+// by all four.
+
 type AuthHandler struct {
 	authService *service.AuthService
 	secure      bool // should be true in production and false in development (set in Config.SecureMode)

@@ -2,6 +2,11 @@ package domain
 
 import "context"
 
+// Repo aggregates every sub-repository interface defined elsewhere in this
+// package into the single interface internal/infra/repo implements against
+// Postgres, plus the transaction primitives services use to wrap
+// multi-step writes.
+
 type Tx interface {
 	Commit(ctx context.Context) error
 	Rollback(ctx context.Context) error

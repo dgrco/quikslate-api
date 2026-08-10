@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+// Business is the top-level tenant: every location, position, and shift
+// belongs to one. This file covers the Business entity itself; membership is
+// in business_member.go.
+
 type Business struct {
 	Id        string    `json:"id"`
 	Name      string    `json:"name"`

@@ -9,9 +9,14 @@ import (
 	"github.com/dgrco/quikslate/internal/response"
 )
 
-// handleServiceError performs a error type check and writes the corresponding error to
-// the provided http.ResponseWriter.
-// On InternalServerError, it also logs to the server (use fnName for specifying)
+// This file centralizes HTTP error handling for the handler package:
+// handleServiceError maps domain/service errors to status codes and
+// public-facing messages, and the ERR_* constants below are those messages.
+
+// handleServiceError inspects err's type/sentinel value and writes the
+// corresponding status code and message to w. This is the single place that
+// maps domain/service errors to HTTP responses; on the fallback 500 case it
+// also logs to the server, using fnName to identify which handler failed.
 func handleServiceError(w http.ResponseWriter, err error, fnName string) {
 	// 1. Check for custom Type-based errors first (to extract data)
 	if valErr, ok := errors.AsType[*domain.ValidationError](err); ok {

@@ -987,8 +987,8 @@ paths:
     put:
       consumes:
       - application/json
-      description: Replace a location's name, address, and timezone. Full replacement
-        — every field is applied as given, so omitting timezone resets it. Admin only.
+      description: 'Replace a location''s name, address, and timezone. Full replacement:
+        every field is applied as given, so omitting timezone resets it. Admin only.'
       parameters:
       - description: Business ID
         in: path
@@ -1230,8 +1230,8 @@ paths:
   /businesses/{businessId}/locations/{locationId}/roles/{userId}:
     delete:
       description: Remove a business member's role at a location. Admin or LocationLead,
-        outranking the target's current standing (role, or business-admin status)
-        — Manager can view the roster but not remove from it. Covers self-targeting
+        outranking the target's current standing (role, or business-admin status);
+        Manager can view the roster but not remove from it. Covers self-targeting
         and admin-targeting automatically.
       parameters:
       - description: Business ID
@@ -1276,10 +1276,10 @@ paths:
     put:
       consumes:
       - application/json
-      description: Assign or change a business member's role at a location. Admin,
+      description: 'Assign or change a business member''s role at a location. Admin,
         LocationLead, or Manager (within the role hierarchy). The caller must outrank
-        the target's current standing (role, or business-admin status), not just the
-        role being granted — this covers self-targeting and admin-targeting automatically.
+        the target''s current standing (role, or business-admin status), not just
+        the role being granted: this covers self-targeting and admin-targeting automatically.'
       parameters:
       - description: Business ID
         in: path
@@ -1328,13 +1328,13 @@ paths:
       - location-roles
   /businesses/{businessId}/locations/{locationId}/shifts:
     get:
-      description: List the shifts at a location overlapping [from, to), joined with
-        the assignee's and position's names. Both range params are required — there
-        is no unbounded listing — and the range may not exceed 90 days. Cancelled
+      description: 'List the shifts at a location overlapping [from, to), joined with
+        the assignee''s and position''s names. Both range params are required (there
+        is no unbounded listing), and the range may not exceed 90 days. Cancelled
         shifts are included. Draft and uncovered shifts are returned only to Admin,
-        LocationLead, and Manager — an unpublished plan and an unfilled slot are both
+        LocationLead, and Manager: an unpublished plan and an unfilled slot are both
         part of building a schedule rather than reading one, so Employees see neither.
-        Any member of the location may call this.
+        Any member of the location may call this.'
       parameters:
       - description: Business ID
         in: path
@@ -1383,11 +1383,11 @@ paths:
     post:
       consumes:
       - application/json
-      description: Create a new shift at a location, optionally pre-assigned to a
+      description: 'Create a new shift at a location, optionally pre-assigned to a
         user. Status must be "draft", "assigned" (requires user_id), or "uncovered"
         (requires no user_id). Returns 409 if a pre-assigned user already has an overlapping
         shift. Admin, Manager, or LocationLead. A pre-assigned user must be able to
-        see the shift — they need a role at this location, or business-admin status.
+        see the shift: they need a role at this location, or business-admin status.'
       parameters:
       - description: Business ID
         in: path
@@ -1519,7 +1519,7 @@ paths:
       consumes:
       - application/json
       description: Partially update a shift's status, position_id, start_time, and/or
-        end_time. Status cannot be set to "assigned" or "cancelled" here — use the
+        end_time. Status cannot be set to "assigned" or "cancelled" here; use the
         dedicated /assign and /cancel endpoints. Moving an assigned shift's times
         returns 409 if it would overlap another of that user's shifts. Admin, Manager,
         or LocationLead; if the shift is assigned, caller must be authorized to act
@@ -1580,8 +1580,8 @@ paths:
       - application/json
       description: Assign a shift to a user and set its status to "assigned". Returns
         409 if the user already has an overlapping shift. Admin, Manager, or LocationLead.
-        The target must be able to see the shift — they need a role at this location,
-        or business-admin status — and the caller must outrank them (see canActOnRole),
+        The target must be able to see the shift (they need a role at this location,
+        or business-admin status), and the caller must outrank them (see canActOnRole),
         except when assigning to themselves.
       parameters:
       - description: Business ID

@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+// Position is a job role a business offers (e.g. "cashier"), used to
+// categorize shifts and to record which positions an employee is qualified
+// to work, see employee_position.go.
+
 type Position struct {
 	Id         string    `json:"id"`
 	BusinessId string    `json:"business_id"`

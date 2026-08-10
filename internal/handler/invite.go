@@ -11,12 +11,18 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// This file implements the invite handler: creating, previewing, accepting,
+// listing, and revoking invites that let an email address join a business at
+// a given location and role.
+
 type InviteHandler struct {
 	inviteService *service.InviteService
 	authService   *service.AuthService
 	jwtSecret     string
 }
 
+// NewInviteHandler constructs an InviteHandler backed by inviteService and
+// authService.
 func NewInviteHandler(
 	inviteService *service.InviteService,
 	authService *service.AuthService,

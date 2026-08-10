@@ -10,6 +10,9 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// users_repo.go implements domain.UserRepository: CRUD for user accounts,
+// independent of any business membership.
+
 const (
 	createUserQuery = `
 		INSERT INTO users (email, name, password)
@@ -48,8 +51,6 @@ func scanUser(row pgx.Row) (domain.User, error) {
 	}
 	return u, nil
 }
-
-// Implement UserRepository interface for PgRepository
 
 // CreateUser inserts a new user with an already-hashed password, returning
 // domain.ErrAlreadyExists if email is already taken.
@@ -105,5 +106,4 @@ func (r *PgRepository) DeleteUser(ctx context.Context, id string) error {
 	return nil
 }
 
-// Compile-time safety check that PgRepository implements UserRepository
 var _ domain.UserRepository = (*PgRepository)(nil)

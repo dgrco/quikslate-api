@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+// Invite represents a pending invitation for someone to join a business at a
+// specific location and role. Accepting one creates the matching
+// BusinessMember and LocationRole rows in a single transaction, see
+// internal/service/invite.go.
+
 type Invite struct {
 	Id         string     `json:"id"`
 	TokenHash  string     `json:"token_hash"`
@@ -18,7 +23,9 @@ type Invite struct {
 	UpdatedAt  time.Time  `json:"updated_at"`
 }
 
-// May be used in the future
+// ValidateInviteExpiration returns an error if expiresAt is already in the
+// past. Not yet wired into the create-invite path; kept for when expiry
+// becomes user-configurable.
 func ValidateInviteExpiration(expiresAt time.Time) error {
 	if time.Now().After(expiresAt) {
 		return NewValidationError("new invite's expiration must not be in the past")

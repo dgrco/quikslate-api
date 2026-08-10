@@ -11,12 +11,18 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// This file implements the shift handler: creating, reading, listing,
+// updating, assigning, unassigning, cancelling, and deleting shifts at a
+// location.
+
 type ShiftHandler struct {
 	shiftService *service.ShiftService
 	authService  *service.AuthService
 	jwtSecret    string
 }
 
+// NewShiftHandler constructs a ShiftHandler backed by shiftService and
+// authService.
 func NewShiftHandler(
 	shiftService *service.ShiftService,
 	authService *service.AuthService,
@@ -65,7 +71,7 @@ type MultipleShiftResponse struct {
 // CreateShift creates a new shift under the location identified by locationId.
 //
 //	@Summary		Create shift
-//	@Description	Create a new shift at a location, optionally pre-assigned to a user. Status must be "draft", "assigned" (requires user_id), or "uncovered" (requires no user_id). Returns 409 if a pre-assigned user already has an overlapping shift. Admin, Manager, or LocationLead. A pre-assigned user must be able to see the shift — they need a role at this location, or business-admin status.
+//	@Description	Create a new shift at a location, optionally pre-assigned to a user. Status must be "draft", "assigned" (requires user_id), or "uncovered" (requires no user_id). Returns 409 if a pre-assigned user already has an overlapping shift. Admin, Manager, or LocationLead. A pre-assigned user must be able to see the shift: they need a role at this location, or business-admin status.
 //	@Tags			shifts
 //	@Security		BearerAuth
 //	@Accept			json
@@ -135,7 +141,7 @@ func (h *ShiftHandler) GetShift(w http.ResponseWriter, r *http.Request) {
 // requested time range.
 //
 //	@Summary		List shifts
-//	@Description	List the shifts at a location overlapping [from, to), joined with the assignee's and position's names. Both range params are required — there is no unbounded listing — and the range may not exceed 90 days. Cancelled shifts are included. Draft and uncovered shifts are returned only to Admin, LocationLead, and Manager — an unpublished plan and an unfilled slot are both part of building a schedule rather than reading one, so Employees see neither. Any member of the location may call this.
+//	@Description	List the shifts at a location overlapping [from, to), joined with the assignee's and position's names. Both range params are required (there is no unbounded listing), and the range may not exceed 90 days. Cancelled shifts are included. Draft and uncovered shifts are returned only to Admin, LocationLead, and Manager: an unpublished plan and an unfilled slot are both part of building a schedule rather than reading one, so Employees see neither. Any member of the location may call this.
 //	@Tags			shifts
 //	@Security		BearerAuth
 //	@Produce		json
@@ -174,7 +180,7 @@ func (h *ShiftHandler) GetShiftsByLocation(w http.ResponseWriter, r *http.Reques
 // UpdateShift partially updates the shift identified by shiftId.
 //
 //	@Summary		Update shift
-//	@Description	Partially update a shift's status, position_id, start_time, and/or end_time. Status cannot be set to "assigned" or "cancelled" here — use the dedicated /assign and /cancel endpoints. Moving an assigned shift's times returns 409 if it would overlap another of that user's shifts. Admin, Manager, or LocationLead; if the shift is assigned, caller must be authorized to act on the assigned user's role (see canActOnRole).
+//	@Description	Partially update a shift's status, position_id, start_time, and/or end_time. Status cannot be set to "assigned" or "cancelled" here; use the dedicated /assign and /cancel endpoints. Moving an assigned shift's times returns 409 if it would overlap another of that user's shifts. Admin, Manager, or LocationLead; if the shift is assigned, caller must be authorized to act on the assigned user's role (see canActOnRole).
 //	@Tags			shifts
 //	@Security		BearerAuth
 //	@Accept			json
@@ -216,7 +222,7 @@ func (h *ShiftHandler) UpdateShift(w http.ResponseWriter, r *http.Request) {
 // AssignShift assigns the shift identified by shiftId to a target user.
 //
 //	@Summary		Assign shift
-//	@Description	Assign a shift to a user and set its status to "assigned". Returns 409 if the user already has an overlapping shift. Admin, Manager, or LocationLead. The target must be able to see the shift — they need a role at this location, or business-admin status — and the caller must outrank them (see canActOnRole), except when assigning to themselves.
+//	@Description	Assign a shift to a user and set its status to "assigned". Returns 409 if the user already has an overlapping shift. Admin, Manager, or LocationLead. The target must be able to see the shift (they need a role at this location, or business-admin status), and the caller must outrank them (see canActOnRole), except when assigning to themselves.
 //	@Tags			shifts
 //	@Security		BearerAuth
 //	@Accept			json

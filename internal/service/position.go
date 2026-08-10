@@ -8,6 +8,10 @@ import (
 	"github.com/dgrco/quikslate/internal/domain"
 )
 
+// PositionService manages the job roles (e.g. "cashier") a business offers,
+// used to categorize shifts and to record which positions an employee is
+// qualified to work.
+
 type PositionService struct {
 	repo domain.Repo
 }
@@ -19,8 +23,8 @@ func NewPositionService(repo domain.Repo) *PositionService {
 	}
 }
 
-// Create a Position
-// (Authorization: admin)
+// CreatePosition adds a new position to the caller's business.
+// Authorization: admin.
 func (ps *PositionService) CreatePosition(
 	ctx context.Context,
 	positionName string,
@@ -41,8 +45,8 @@ func (ps *PositionService) CreatePosition(
 	return p, nil
 }
 
-// Get a Position
-// (Authorization: any business member)
+// GetPosition returns positionId's details. Authorization: any business
+// member.
 func (ps *PositionService) GetPosition(
 	ctx context.Context,
 	positionId string,
@@ -55,8 +59,8 @@ func (ps *PositionService) GetPosition(
 	return p, nil
 }
 
-// Get all Positions that exist in a Business
-// (Authorization: any business member)
+// GetAllPositionsByBusiness lists every position the caller's business
+// offers. Authorization: any business member.
 func (ps *PositionService) GetAllPositionsByBusiness(ctx context.Context) ([]domain.Position, error) {
 	positions, err := ps.repo.GetPositionsByBusinessId(ctx, ctxkeys.GetBusinessId(ctx))
 	if err != nil {
@@ -66,8 +70,7 @@ func (ps *PositionService) GetAllPositionsByBusiness(ctx context.Context) ([]dom
 	return positions, nil
 }
 
-// Rename a Position at a Business
-// (Authorization: admin)
+// RenamePosition changes positionId's name. Authorization: admin.
 func (ps *PositionService) RenamePosition(
 	ctx context.Context,
 	positionId,
@@ -93,8 +96,7 @@ func (ps *PositionService) RenamePosition(
 	return nil
 }
 
-// Delete a Position at a Business
-// (Authorization: admin)
+// DeletePosition deletes positionId. Authorization: admin.
 func (ps *PositionService) DeletePosition(
 	ctx context.Context,
 	positionId string,

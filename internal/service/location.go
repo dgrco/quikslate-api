@@ -8,6 +8,9 @@ import (
 	"github.com/dgrco/quikslate/internal/domain"
 )
 
+// LocationService manages a business's locations: the physical sites where
+// positions are offered and shifts are scheduled.
+
 type LocationService struct {
 	repo domain.Repo
 }
@@ -19,10 +22,9 @@ func NewLocationService(repo domain.Repo) *LocationService {
 	}
 }
 
-// Create a Location and associate it with a businessId.
-// The location must have a name and an IANA timezone, and it may optionally
-// contain an address.
-// (Authorization: admin)
+// CreateLocation adds a new location to the caller's business. It must have
+// a name and an IANA timezone; the address is optional. Authorization:
+// admin.
 func (ls *LocationService) CreateLocation(
 	ctx context.Context,
 	locationName string,
@@ -48,8 +50,8 @@ func (ls *LocationService) CreateLocation(
 	return l, nil
 }
 
-// Get a Location given a locationId
-// (Authorization: any business member)
+// GetLocation returns locationId's details. Authorization: any business
+// member.
 func (ls *LocationService) GetLocation(
 	ctx context.Context,
 	locationId string,
@@ -61,8 +63,8 @@ func (ls *LocationService) GetLocation(
 	return l, nil
 }
 
-// Get all Locations associated to a businessId
-// (Authorization: any business member)
+// GetAllLocations lists every location in the caller's business.
+// Authorization: any business member.
 func (ls *LocationService) GetAllLocations(
 	ctx context.Context,
 ) ([]domain.Location, error) {
@@ -73,8 +75,9 @@ func (ls *LocationService) GetAllLocations(
 	return locations, nil
 }
 
-// Update a Location with locationId, replacing its name, address, and timezone
-// (Authorization: admin)
+// UpdateLocation replaces locationId's name, address, and timezone. There is
+// no partial-update path, every field in update is always applied.
+// Authorization: admin.
 func (ls *LocationService) UpdateLocation(
 	ctx context.Context,
 	locationId string,
@@ -96,8 +99,7 @@ func (ls *LocationService) UpdateLocation(
 	return nil
 }
 
-// Delete a Location by its locationId
-// (Authorization: admin)
+// DeleteLocation deletes locationId. Authorization: admin.
 func (ls *LocationService) DeleteLocation(
 	ctx context.Context,
 	locationId string,

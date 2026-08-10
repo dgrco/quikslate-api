@@ -9,6 +9,10 @@ import (
 	"github.com/dgrco/quikslate/internal/domain"
 )
 
+// Shared authorization helpers used by the other files in this package.
+// Middleware (internal/handler) only establishes who the caller is; these
+// functions decide what that caller is allowed to do.
+
 // validateIsAdmin returns ErrForbidden if the requestor is not an admin.
 func validateIsAdmin(ctx context.Context) error {
 	if !ctxkeys.GetIsAdmin(ctx) {
@@ -131,7 +135,7 @@ func canActOnRole(callerRole, targetRole domain.LRole) bool {
 	return rank(callerRole) > rank(targetRole)
 }
 
-// effectiveRole returns domain.Admin if isAdmin, otherwise locationRole —
+// effectiveRole returns domain.Admin if isAdmin, otherwise locationRole,
 // folding business-admin status into a single value for rank comparisons.
 func effectiveRole(isAdmin bool, locationRole domain.LRole) domain.LRole {
 	if isAdmin {
@@ -163,11 +167,11 @@ func checkCanActOnLocationRole(ctx context.Context, repo domain.Repo, targetUser
 // express: the assignee has to be able to *see* the shift. Listing a
 // location's shifts requires a role there (or business-admin status), so
 // assigning someone without either produces a shift they're named on and
-// cannot view — a silently broken schedule rather than a rejected request.
+// cannot view: a silently broken schedule rather than a rejected request.
 //
 // Self-assignment is always allowed. The caller has already cleared
 // requireLocationRole for this location, so they can see the shift by
-// definition, and putting yourself on a schedule isn't privilege escalation —
+// definition, and putting yourself on a schedule isn't privilege escalation;
 // canActOnRole's strict-outranking rule exists to stop peers acting on each
 // other's *roles*, which is a different question.
 //

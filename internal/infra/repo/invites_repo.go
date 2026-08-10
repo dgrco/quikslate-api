@@ -11,6 +11,10 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// invites_repo.go implements domain.InviteRepository: CRUD for pending
+// invitations that let a business add a new member at a given location and
+// role.
+
 const (
 	createInviteQuery = `
 		INSERT INTO invites (token_hash, email, business_id, location_id, role, expires_at)
@@ -132,12 +136,10 @@ func (r *PgRepository) GetInviteByTokenHash(ctx context.Context, tokenHash strin
 	return inv, nil
 }
 
-// GetPendingInviteByEmailAndBusinessId fetches the pending invite
-// between a user's email and a business (if it exists)
-// and returns the invite.
-// It is guaranteed that at most one such pending invite exists
-// due to the unique index created on the invites table
-// between (email, business_id) where accepted_at is NULL.
+// GetPendingInviteByEmailAndBusinessId fetches the pending invite between
+// email and businessId, if one exists. At most one can exist at a time,
+// enforced by the unique index on (email, business_id) where accepted_at
+// IS NULL.
 func (r *PgRepository) GetPendingInviteByEmailAndBusinessId(
 	ctx context.Context,
 	email,
@@ -196,7 +198,7 @@ func (r *PgRepository) GetPendingInvitesByLocationId(ctx context.Context, locati
 // DeleteInvite deletes the invite matching id, returning domain.ErrNotFound
 // if no such invite exists. Callers that need to scope this to a specific
 // location (e.g. RevokeInvite) should verify that themselves before calling
-// this — it doesn't check on its own.
+// this; it doesn't check on its own.
 func (r *PgRepository) DeleteInvite(ctx context.Context, id string) error {
 	cmdTag, err := r.exec.Exec(ctx, deleteInviteQuery, id)
 	if err != nil {

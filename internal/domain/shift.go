@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+// Shift is a scheduled block of work at a location, optionally assigned to
+// a user. Most of this file is validation for shift status transitions and
+// time ranges, which exists to keep malformed client requests from reaching
+// Postgres as opaque driver errors instead of clean 400s.
+
 type ShiftStatus string
 
 const (
@@ -29,7 +34,7 @@ type Shift struct {
 }
 
 // ShiftDetail is a Shift joined with its assignee's name and its position's
-// name — the shape a schedule actually needs to render, without forcing the
+// name: the shape a schedule actually needs to render, without forcing the
 // client into a second round trip per shift.
 //
 // It deliberately carries UserName but NOT the user's email. Listing shifts is
@@ -64,7 +69,7 @@ func ValidateShiftTimes(startTime, endTime time.Time) error {
 
 // ValidateShiftStatus returns a ValidationError unless status is one of the
 // five shift_status enum values. Without this an unrecognized status reaches
-// the Postgres enum, which rejects it as a driver error — surfacing to the
+// the Postgres enum, which rejects it as a driver error, surfacing to the
 // client as a logged 500 rather than the 400 it actually is.
 func ValidateShiftStatus(status ShiftStatus) error {
 	switch status {
@@ -81,7 +86,7 @@ func ValidateShiftStatus(status ShiftStatus) error {
 //
 // Covered and Cancelled are rejected outright: both describe something that
 // happened to an existing shift, and each has its own transition endpoint.
-// Draft is allowed either way — drafting a schedule with tentative
+// Draft is allowed either way: drafting a schedule with tentative
 // pre-assignments is a real workflow.
 func ValidateShiftCreateStatus(status ShiftStatus, userId *string) error {
 	if err := ValidateShiftStatus(status); err != nil {
@@ -105,7 +110,7 @@ func ValidateShiftCreateStatus(status ShiftStatus, userId *string) error {
 // ValidateShiftUpdateStatus rejects the two statuses that have dedicated
 // transition endpoints. Reaching "assigned" means picking an assignee and
 // "cancelled" means a soft delete; routing them through the generic PATCH
-// would let a client set the label without performing the transition —
+// would let a client set the label without performing the transition,
 // e.g. marking a shift "assigned" while leaving user_id NULL.
 func ValidateShiftUpdateStatus(status ShiftStatus) error {
 	if err := ValidateShiftStatus(status); err != nil {
@@ -155,12 +160,12 @@ type ShiftRepository interface {
 	) (Shift, error)
 	GetShiftById(ctx context.Context, id string) (Shift, error)
 	// GetShiftDetailsByLocationId returns the shifts at locationId that
-	// overlap [from, to) — half-open, so a shift straddling a week boundary
+	// overlap [from, to): half-open, so a shift straddling a week boundary
 	// shows up in both weeks and one ending exactly at `from` shows up in
 	// neither twice.
 	//
 	// managerView includes the shifts that exist for building a schedule
-	// rather than reading one — drafts, and slots nobody is on yet. Pass false
+	// rather than reading one: drafts, and slots nobody is on yet. Pass false
 	// for Employees. The filtering is done in SQL, not after the fact, so
 	// those rows never leave the database for callers who shouldn't have them.
 	GetShiftDetailsByLocationId(ctx context.Context, locationId string, from, to time.Time, managerView bool) ([]ShiftDetail, error)

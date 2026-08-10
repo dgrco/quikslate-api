@@ -1,6 +1,7 @@
 package handler
 
-// This package contains types that are used across files
+// This file holds response types and constants shared across the handler
+// package: the generic SimpleResponse body and request-size limits.
 
 // Response Structures
 

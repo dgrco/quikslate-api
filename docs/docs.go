@@ -848,7 +848,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Replace a location's name, address, and timezone. Full replacement — every field is applied as given, so omitting timezone resets it. Admin only.",
+                "description": "Replace a location's name, address, and timezone. Full replacement: every field is applied as given, so omitting timezone resets it. Admin only.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1264,7 +1264,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Assign or change a business member's role at a location. Admin, LocationLead, or Manager (within the role hierarchy). The caller must outrank the target's current standing (role, or business-admin status), not just the role being granted — this covers self-targeting and admin-targeting automatically.",
+                "description": "Assign or change a business member's role at a location. Admin, LocationLead, or Manager (within the role hierarchy). The caller must outrank the target's current standing (role, or business-admin status), not just the role being granted: this covers self-targeting and admin-targeting automatically.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1340,7 +1340,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Remove a business member's role at a location. Admin or LocationLead, outranking the target's current standing (role, or business-admin status) — Manager can view the roster but not remove from it. Covers self-targeting and admin-targeting automatically.",
+                "description": "Remove a business member's role at a location. Admin or LocationLead, outranking the target's current standing (role, or business-admin status); Manager can view the roster but not remove from it. Covers self-targeting and admin-targeting automatically.",
                 "produces": [
                     "application/json"
                 ],
@@ -1406,7 +1406,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "List the shifts at a location overlapping [from, to), joined with the assignee's and position's names. Both range params are required — there is no unbounded listing — and the range may not exceed 90 days. Cancelled shifts are included. Draft and uncovered shifts are returned only to Admin, LocationLead, and Manager — an unpublished plan and an unfilled slot are both part of building a schedule rather than reading one, so Employees see neither. Any member of the location may call this.",
+                "description": "List the shifts at a location overlapping [from, to), joined with the assignee's and position's names. Both range params are required (there is no unbounded listing), and the range may not exceed 90 days. Cancelled shifts are included. Draft and uncovered shifts are returned only to Admin, LocationLead, and Manager: an unpublished plan and an unfilled slot are both part of building a schedule rather than reading one, so Employees see neither. Any member of the location may call this.",
                 "produces": [
                     "application/json"
                 ],
@@ -1477,7 +1477,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Create a new shift at a location, optionally pre-assigned to a user. Status must be \"draft\", \"assigned\" (requires user_id), or \"uncovered\" (requires no user_id). Returns 409 if a pre-assigned user already has an overlapping shift. Admin, Manager, or LocationLead. A pre-assigned user must be able to see the shift — they need a role at this location, or business-admin status.",
+                "description": "Create a new shift at a location, optionally pre-assigned to a user. Status must be \"draft\", \"assigned\" (requires user_id), or \"uncovered\" (requires no user_id). Returns 409 if a pre-assigned user already has an overlapping shift. Admin, Manager, or LocationLead. A pre-assigned user must be able to see the shift: they need a role at this location, or business-admin status.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1676,7 +1676,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Partially update a shift's status, position_id, start_time, and/or end_time. Status cannot be set to \"assigned\" or \"cancelled\" here — use the dedicated /assign and /cancel endpoints. Moving an assigned shift's times returns 409 if it would overlap another of that user's shifts. Admin, Manager, or LocationLead; if the shift is assigned, caller must be authorized to act on the assigned user's role (see canActOnRole).",
+                "description": "Partially update a shift's status, position_id, start_time, and/or end_time. Status cannot be set to \"assigned\" or \"cancelled\" here; use the dedicated /assign and /cancel endpoints. Moving an assigned shift's times returns 409 if it would overlap another of that user's shifts. Admin, Manager, or LocationLead; if the shift is assigned, caller must be authorized to act on the assigned user's role (see canActOnRole).",
                 "consumes": [
                     "application/json"
                 ],
@@ -1760,7 +1760,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Assign a shift to a user and set its status to \"assigned\". Returns 409 if the user already has an overlapping shift. Admin, Manager, or LocationLead. The target must be able to see the shift — they need a role at this location, or business-admin status — and the caller must outrank them (see canActOnRole), except when assigning to themselves.",
+                "description": "Assign a shift to a user and set its status to \"assigned\". Returns 409 if the user already has an overlapping shift. Admin, Manager, or LocationLead. The target must be able to see the shift (they need a role at this location, or business-admin status), and the caller must outrank them (see canActOnRole), except when assigning to themselves.",
                 "consumes": [
                     "application/json"
                 ],

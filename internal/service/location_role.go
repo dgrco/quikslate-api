@@ -9,6 +9,11 @@ import (
 	"github.com/dgrco/quikslate/internal/domain"
 )
 
+// LocationRoleService manages who holds what role (Employee, Manager,
+// LocationLead) at a location. All of the role-hierarchy authorization
+// rules from authorization_checks.go apply here since this is where roles
+// are actually granted and revoked.
+
 type LocationRoleService struct {
 	repo domain.Repo
 }
@@ -60,7 +65,7 @@ func (lrs *LocationRoleService) AssignRole(ctx context.Context, locationId, user
 // RemoveRole removes a business member's role at a location.
 // (Authorization: admin or LocationLead; Manager is blocked outright.
 // Beyond that, the caller must outrank the target's current standing via
-// effectiveRole — the same check AssignRole uses, which also rules out
+// effectiveRole, the same check AssignRole uses, which also rules out
 // self-targeting for free.)
 func (lrs *LocationRoleService) RemoveRole(ctx context.Context, locationId, userId string) error {
 	callerRole := resolveCallerRole(ctx)
@@ -92,7 +97,7 @@ func (lrs *LocationRoleService) RemoveRole(ctx context.Context, locationId, user
 
 // GetLocationRoles returns the roster for a location: every business member
 // with a role there, with their name/email for display.
-// (Authorization: admin, LocationLead, or Manager — Employees don't get
+// (Authorization: admin, LocationLead, or Manager; Employees don't get
 // visibility into their coworkers' emails)
 func (lrs *LocationRoleService) GetLocationRoles(ctx context.Context, locationId string) ([]domain.LocationRoleDetail, error) {
 	if _, err := requireLocationRole(ctx, domain.Manager, domain.LocationLead); err != nil {
@@ -108,7 +113,7 @@ func (lrs *LocationRoleService) GetLocationRoles(ctx context.Context, locationId
 
 // GetAssignableMembers returns every member of the caller's business, for
 // populating a "who should I assign a role to at this location" picker.
-// Unlike GetLocationRoles, results aren't filtered to this location — any
+// Unlike GetLocationRoles, results aren't filtered to this location: any
 // business member is eligible to be newly assigned here.
 // (Authorization: admin, or LocationLead at this location. Manager is
 // excluded: this exposes the full business directory, a broader capability

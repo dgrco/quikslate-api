@@ -8,6 +8,11 @@ import (
 	"github.com/dgrco/quikslate/internal/domain"
 )
 
+// BusinessService implements the business-management use cases: creating a
+// business, renaming or deleting it, and managing membership (admin status,
+// removal). Most methods expect businessId, and often userId, to already be
+// resolved into ctx by internal/handler's auth middleware.
+
 type BusinessService struct {
 	repo domain.Repo
 }
@@ -19,8 +24,8 @@ func NewBusinessService(repo domain.Repo) *BusinessService {
 	}
 }
 
-// Create a Business.
-// Anyone authenticated can make a business.
+// CreateBusiness creates a new business and adds the caller as its primary
+// admin, in one transaction. Any authenticated user may create a business.
 func (bs *BusinessService) CreateBusiness(ctx context.Context, name string) (string, error) {
 	if err := domain.ValidateBusinessName(name); err != nil {
 		return "", fmt.Errorf("failed to create business: %w", err)
@@ -52,9 +57,9 @@ func (bs *BusinessService) CreateBusiness(ctx context.Context, name string) (str
 	return b.Id, nil
 }
 
-// Get all businesses a user belongs to
-// Implicit parameters set by http context: {userId}
-// (Authorization: all, but only the user may query their own)
+// GetBusinessesByUserId returns every business the caller belongs to.
+// Authorization: any authenticated user; the user ID comes from ctx, so
+// callers can only query their own membership.
 func (bs *BusinessService) GetBusinessesByUserId(ctx context.Context) ([]domain.Business, error) {
 	businesses, err := bs.repo.GetBusinessesByUserId(ctx, ctxkeys.GetUserId(ctx))
 	if err != nil {
@@ -64,9 +69,7 @@ func (bs *BusinessService) GetBusinessesByUserId(ctx context.Context) ([]domain.
 	return businesses, nil
 }
 
-// Get a Business.
-// Implicit parameters set by http context: {businessId}
-// (Authorization: admin)
+// GetBusiness returns businessId's details. Authorization: admin.
 func (bs *BusinessService) GetBusiness(ctx context.Context) (domain.Business, error) {
 	if err := validateIsAdmin(ctx); err != nil {
 		return domain.Business{}, fmt.Errorf("failed to get business: %w", err)
@@ -81,7 +84,7 @@ func (bs *BusinessService) GetBusiness(ctx context.Context) (domain.Business, er
 }
 
 // MyBusinessMembership is the caller's own standing within a business: their
-// admin status (read straight from context — already computed fresh by
+// admin status (read straight from context, already computed fresh by
 // RequireBusinessMember for this request, so no extra DB call) plus every
 // location role they hold within it. It exists so the frontend can decide
 // what admin-only or location-scoped UI to show without probing each action
@@ -93,10 +96,8 @@ type MyBusinessMembership struct {
 }
 
 // GetMyBusinessMembership returns the caller's own admin status and location
-// roles for businessId.
-// Implicit parameters set by http context: {businessId}
-// (Authorization: any business member — this is a self-lookup, not a
-// listing of others)
+// roles for businessId. Authorization: any business member, since this is a
+// self-lookup rather than a listing of others.
 func (bs *BusinessService) GetMyBusinessMembership(ctx context.Context) (MyBusinessMembership, error) {
 	businessId := ctxkeys.GetBusinessId(ctx)
 
@@ -112,9 +113,8 @@ func (bs *BusinessService) GetMyBusinessMembership(ctx context.Context) (MyBusin
 	}, nil
 }
 
-// Get Business Member Details for every user in a business.
-// Implicit parameters set by http context: {businessId}
-// (Authorization: admin)
+// GetBusinessMemberDetailsByBusinessId returns every member of businessId,
+// joined with their name and email for display. Authorization: admin.
 func (bs *BusinessService) GetBusinessMemberDetailsByBusinessId(ctx context.Context) ([]domain.BusinessMemberDetail, error) {
 	if err := validateIsAdmin(ctx); err != nil {
 		return nil, fmt.Errorf("failed to get business member details by business ID: %w", err)
@@ -128,9 +128,7 @@ func (bs *BusinessService) GetBusinessMemberDetailsByBusinessId(ctx context.Cont
 	return bmds, nil
 }
 
-// Rename a Business.
-// Implicit parameters set by http context: {businessId}
-// (Authorization: admin)
+// RenameBusiness changes businessId's name. Authorization: admin.
 func (bs *BusinessService) RenameBusiness(ctx context.Context, businessName string) error {
 	if err := validateIsAdmin(ctx); err != nil {
 		return fmt.Errorf("failed to rename business: %w", err)
@@ -147,9 +145,7 @@ func (bs *BusinessService) RenameBusiness(ctx context.Context, businessName stri
 	return nil
 }
 
-// Delete a Business.
-// Implicit parameters set by http context: {businessId}
-// (Authorization: admin)
+// DeleteBusiness deletes businessId. Authorization: admin.
 func (bs *BusinessService) DeleteBusiness(ctx context.Context) error {
 	if err := validateIsAdmin(ctx); err != nil {
 		return fmt.Errorf("failed to delete business: %w", err)
@@ -162,9 +158,10 @@ func (bs *BusinessService) DeleteBusiness(ctx context.Context) error {
 	return nil
 }
 
-// Remove a User from a Business.
-// Implicit parameters set by http context: {businessId}
-// (Authorization: admin)
+// RemoveUserFromBusiness removes userId from businessId, along with every
+// location role and position they held there. Refuses to remove the last
+// remaining admin. Authorization: admin, and the caller must
+// canActOnBusinessMember the target.
 func (s *BusinessService) RemoveUserFromBusiness(ctx context.Context, userId string) error {
 	if err := validateIsAdmin(ctx); err != nil {
 		return fmt.Errorf("failed to remove user from business: %w", err)
@@ -218,9 +215,10 @@ func (s *BusinessService) RemoveUserFromBusiness(ctx context.Context, userId str
 	return tx.Commit(ctx)
 }
 
-// Sets the admin status of a User.
-// Implicit parameters from context: {businessId}
-// (Authorization: admin)
+// SetAdminForBusinessMember promotes or demotes userId's admin status
+// within businessId. Refuses to demote the last remaining admin.
+// Authorization: admin, and the caller must canActOnBusinessMember the
+// target.
 func (s *BusinessService) SetAdminForBusinessMember(ctx context.Context, userId string, admin bool) error {
 	if err := validateIsAdmin(ctx); err != nil {
 		return fmt.Errorf("failed to remove user from business: %w", err)

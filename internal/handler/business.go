@@ -12,12 +12,18 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// This file implements the business handler: creating a business, reading
+// and renaming it, deleting it, and managing membership (listing members,
+// removing them, granting or revoking admin status).
+
 type BusinessHandler struct {
 	businessService *service.BusinessService
 	authService     *service.AuthService
 	jwtSecret       string
 }
 
+// NewBusinessHandler constructs a BusinessHandler backed by businessService
+// and authService.
 func NewBusinessHandler(
 	businessService *service.BusinessService,
 	authService *service.AuthService,

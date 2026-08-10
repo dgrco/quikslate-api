@@ -17,6 +17,10 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
+// main.go is the composition root: it loads config, connects to the
+// database, wires a PgRepository into each service and each service into
+// its handler, and starts the chi router.
+
 // @title						QuikSlate API
 // @version					1.0
 // @description				Scheduling API for businesses, locations, positions, shifts, and employees.

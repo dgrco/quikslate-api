@@ -9,6 +9,11 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// authz.go implements domain.AuthzContextRepository: looking up a caller's
+// admin flags for a business and, for location-scoped calls, their role at a
+// location, so the service layer can authorize requests without embedding
+// that data in the JWT (see api/CLAUDE.md's auth model).
+
 const (
 	getBusinessMemberAuthzQuery = `
 		SELECT is_admin, is_primary_admin

@@ -9,6 +9,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// locations_repo.go implements domain.LocationRepository: CRUD for
+// locations, which belong to a business and in turn own positions, shifts,
+// and location roles.
+
 const (
 	createLocationQuery = `
 		INSERT INTO locations (business_id, name, address, timezone)
@@ -89,7 +93,7 @@ func (r *PgRepository) CreateLocation(ctx context.Context, businessId, name stri
 
 // GetLocationById fetches a location by id, returning domain.ErrNotFound if
 // no such location exists. Callers that need to enforce it belongs to a
-// particular business must check the returned BusinessId themselves — this
+// particular business must check the returned BusinessId themselves; this
 // does no business-scoping on its own.
 func (r *PgRepository) GetLocationById(ctx context.Context, id string) (domain.Location, error) {
 	l, err := scanLocation(r.exec.QueryRow(ctx, getLocationByIdQuery, id))

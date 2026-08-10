@@ -10,12 +10,17 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// This file implements the location handler: creating, reading, listing,
+// updating, and deleting a business's locations.
+
 type LocationHandler struct {
 	locationService *service.LocationService
 	authService     *service.AuthService
 	jwtSecret       string
 }
 
+// NewLocationHandler constructs a LocationHandler backed by locationService
+// and authService.
 func NewLocationHandler(
 	locationService *service.LocationService,
 	authService *service.AuthService,
@@ -30,10 +35,11 @@ func NewLocationHandler(
 
 // Request Structures
 
-// Timezone is an IANA name (e.g. "America/New_York"). It's required on both
-// requests, not optional-with-a-default: updateLocationRequest is a full
-// replacement (see domain.LocationUpdate), so accepting an empty value here
-// would silently reset an existing location to UTC.
+// createLocationRequest's Timezone is an IANA name (e.g. "America/New_York").
+// It's required on both this and updateLocationRequest, not
+// optional-with-a-default: both are full replacements (see
+// domain.LocationUpdate), so accepting an empty value here would silently
+// reset an existing location to UTC.
 type createLocationRequest struct {
 	Name     string  `json:"name"`
 	Address  *string `json:"address"`
@@ -142,7 +148,7 @@ func (h *LocationHandler) GetAllLocations(w http.ResponseWriter, r *http.Request
 // UpdateLocation fully replaces the name, address, and timezone of the location identified by locationId.
 //
 //	@Summary		Update location
-//	@Description	Replace a location's name, address, and timezone. Full replacement — every field is applied as given, so omitting timezone resets it. Admin only.
+//	@Description	Replace a location's name, address, and timezone. Full replacement: every field is applied as given, so omitting timezone resets it. Admin only.
 //	@Tags			locations
 //	@Security		BearerAuth
 //	@Accept			json

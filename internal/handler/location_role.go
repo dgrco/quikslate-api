@@ -11,12 +11,18 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// This file implements the location-role handler: assigning, removing, and
+// listing the per-location roles business members hold, plus listing members
+// eligible to be assigned one.
+
 type LocationRoleHandler struct {
 	locationRoleService *service.LocationRoleService
 	authService         *service.AuthService
 	jwtSecret           string
 }
 
+// NewLocationRoleHandler constructs a LocationRoleHandler backed by
+// locationRoleService and authService.
 func NewLocationRoleHandler(
 	locationRoleService *service.LocationRoleService,
 	authService *service.AuthService,
@@ -57,7 +63,7 @@ type MultipleLocationRoleResponse struct {
 // AssignLocationRole assigns or changes the target user's role at the location identified by locationId.
 //
 //	@Summary		Assign location role
-//	@Description	Assign or change a business member's role at a location. Admin, LocationLead, or Manager (within the role hierarchy). The caller must outrank the target's current standing (role, or business-admin status), not just the role being granted — this covers self-targeting and admin-targeting automatically.
+//	@Description	Assign or change a business member's role at a location. Admin, LocationLead, or Manager (within the role hierarchy). The caller must outrank the target's current standing (role, or business-admin status), not just the role being granted: this covers self-targeting and admin-targeting automatically.
 //	@Tags			location-roles
 //	@Security		BearerAuth
 //	@Accept			json
@@ -94,7 +100,7 @@ func (h *LocationRoleHandler) AssignLocationRole(w http.ResponseWriter, r *http.
 // RemoveLocationRole removes the target user's role at the location identified by locationId.
 //
 //	@Summary		Remove location role
-//	@Description	Remove a business member's role at a location. Admin or LocationLead, outranking the target's current standing (role, or business-admin status) — Manager can view the roster but not remove from it. Covers self-targeting and admin-targeting automatically.
+//	@Description	Remove a business member's role at a location. Admin or LocationLead, outranking the target's current standing (role, or business-admin status); Manager can view the roster but not remove from it. Covers self-targeting and admin-targeting automatically.
 //	@Tags			location-roles
 //	@Security		BearerAuth
 //	@Produce		json

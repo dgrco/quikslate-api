@@ -10,6 +10,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// shifts_repo.go implements domain.ShiftRepository: CRUD and status
+// transitions (assign, unassign, cancel) for shifts, plus the queries
+// backing schedule display and overlap checks.
+
 const (
 	createShiftQuery = `
 		INSERT INTO shifts (user_id, location_id, position_id, status, start_time, end_time)
@@ -26,7 +30,7 @@ const (
 		FROM shifts
 		WHERE id = $1
 	`
-	// LEFT JOIN on users because an unassigned shift has a NULL user_id — an
+	// LEFT JOIN on users because an unassigned shift has a NULL user_id: an
 	// inner join would silently drop exactly the open shifts a scheduler most
 	// needs to see. u.email is deliberately absent (see domain.ShiftDetail).
 	getShiftDetailsByLocationIdQuery = `
@@ -41,7 +45,7 @@ const (
 		  AND ($4 OR s.status NOT IN ('draft', 'uncovered'))
 		ORDER BY s.start_time
 	`
-	// $4 is the shift to exclude, or NULL to exclude nothing — folding both
+	// $4 is the shift to exclude, or NULL to exclude nothing, folding both
 	// cases into one query rather than building SQL conditionally.
 	// Cancelled shifts are excluded: a cancelled shift isn't a real booking,
 	// so it must not block scheduling someone back into that slot.
@@ -176,7 +180,7 @@ func (r *PgRepository) GetShiftById(ctx context.Context, id string) (domain.Shif
 
 // GetShiftDetailsByLocationId returns the shifts at locationId overlapping
 // [from, to), joined with the assignee's and position's names, oldest start
-// first. Cancelled shifts are included — the caller decides how to present
+// first. Cancelled shifts are included: the caller decides how to present
 // them, and hiding them here would make a cancellation look like a deletion.
 func (r *PgRepository) GetShiftDetailsByLocationId(
 	ctx context.Context,
@@ -201,7 +205,7 @@ func (r *PgRepository) GetShiftDetailsByLocationId(
 // GetOverlappingShiftsForUser returns userId's non-cancelled shifts
 // overlapping [from, to), optionally excluding one shift by id so an edit
 // doesn't conflict with the shift being edited. Note this spans every
-// location in every business — a person can't be in two places at once, and
+// location in every business: a person can't be in two places at once, and
 // the caller has already been authorized against the shift they're acting on.
 func (r *PgRepository) GetOverlappingShiftsForUser(
 	ctx context.Context,
@@ -223,7 +227,7 @@ func (r *PgRepository) GetOverlappingShiftsForUser(
 	return shifts, nil
 }
 
-// UpdateShiftById partially updates a shift's status/start/end time — only
+// UpdateShiftById partially updates a shift's status/start/end time; only
 // the non-nil fields of update are written. A no-op (returns nil without
 // querying) if update has no fields set at all.
 func (r *PgRepository) UpdateShiftById(ctx context.Context, id string, update domain.ShiftUpdate) error {
@@ -296,7 +300,7 @@ func (r *PgRepository) CancelShift(ctx context.Context, id string) error {
 }
 
 // DeleteShift permanently deletes a shift row (should only be used for admin
-// purposes — CancelShift is the normal way to remove a shift), returning
+// purposes; CancelShift is the normal way to remove a shift), returning
 // domain.ErrNotFound if id doesn't match any row.
 func (r *PgRepository) DeleteShift(ctx context.Context, id string) error {
 	cmdTag, err := r.exec.Exec(ctx, deleteShiftQuery, id)

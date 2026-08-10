@@ -13,6 +13,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// This file implements the three chi auth middlewares that build up request
+// context via internal/ctxkeys, in increasing specificity: RequireIdentity
+// (userId only), RequireBusinessMember (adds business-scoped authz), and
+// RequireLocationMember (adds location-scoped authz). See api/CLAUDE.md for
+// which one to use for a given route.
+
 func parseAccessToken(r *http.Request, jwtSecret string) (*auth.AccessTokenClaims, error) {
 	header := r.Header.Get("Authorization")
 	if !strings.HasPrefix(header, "Bearer ") {

@@ -19,7 +19,7 @@ func TestCanActOnRole(t *testing.T) {
 		{"admin can act on employee", domain.Admin, domain.Employee, true},
 		{"admin can act on manager", domain.Admin, domain.Manager, true},
 		{"admin can act on location lead", domain.Admin, domain.LocationLead, true},
-		// Same rank as the caller is rejected uniformly, even for Admin — this
+		// Same rank as the caller is rejected uniformly, even for Admin: this
 		// used to return true (flagged here as "is this problematic?" before it
 		// was ever fixed); rank(Admin) > rank(Admin) is false like any other
 		// same-rank pair, which is also what makes self-targeting rejection
@@ -129,7 +129,7 @@ func TestCanActOnBusinessMember(t *testing.T) {
 
 // fakeLocationRepo is a minimal domain.Repo test double. domain.Repo is a big
 // interface (it embeds every sub-repo), but getAndValidateLocation only ever
-// calls GetLocationById — so we embed the (nil) interface to satisfy the
+// calls GetLocationById, so we embed the (nil) interface to satisfy the
 // domain.Repo parameter type, and override just the one method we need.
 // Calling any other method on it would nil-panic, which is fine: this test
 // never exercises them.
@@ -163,7 +163,7 @@ func TestGetAndValidateLocation(t *testing.T) {
 			// enforces this at the source (see the join on locations in
 			// GetLocationMemberAuthzContext's SQL, internal/infra/repo/
 			// authz.go), but this service-layer check remains as the second
-			// line of defense — and it's the only check for callers that
+			// line of defense, and it's the only check for callers that
 			// reach getAndValidateLocation via a resource lookup rather than
 			// the route's own {locationId} (e.g. getAndValidateShift checking
 			// a shift's stored locationId), which the middleware can't see.

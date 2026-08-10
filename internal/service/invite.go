@@ -11,6 +11,12 @@ import (
 	"github.com/dgrco/quikslate/internal/domain"
 )
 
+// InviteService lets an admin or LocationLead bring a new person into a
+// business at a specific location and role, without that person needing an
+// account first. Invites are single-use, expire after 7 days, and are
+// identified to the invitee by an opaque token (never the DB id), hashed
+// the same way refresh tokens are, see AuthService.
+
 type InviteService struct {
 	repo domain.Repo
 }
@@ -155,7 +161,7 @@ func (s *InviteService) GetPendingInvites(ctx context.Context, locationId string
 // RevokeInvite cancels a not-yet-accepted invite at locationId, freeing the
 // email up to be invited again.
 // (Authorization: admin, or LocationLead who outranks the invite's target
-// role — a LocationLead can't revoke an invite for a role they couldn't
+// role: a LocationLead can't revoke an invite for a role they couldn't
 // have created themselves, e.g. one for a fellow LocationLead.)
 func (s *InviteService) RevokeInvite(ctx context.Context, locationId, inviteId string) error {
 	inv, err := s.repo.GetInviteById(ctx, inviteId)

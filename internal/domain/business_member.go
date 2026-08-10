@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+// A user becomes a BusinessMember when they join a business, independent of
+// any location-specific role (see location_role.go for that). Membership
+// tracks admin status; the primary admin cannot be demoted or removed, see
+// IsPrimaryAdmin.
+
 type BusinessMember struct {
 	UserId         string    `json:"user_id"`
 	BusinessId     string    `json:"business_id"`

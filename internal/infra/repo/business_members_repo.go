@@ -10,6 +10,10 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// business_members_repo.go implements domain.BusinessMemberRepository:
+// managing the business_members join table that links users to the
+// businesses they belong to, along with their admin/primary-admin flags.
+
 const (
 	addUserToBusinessQuery = `
 		INSERT INTO business_members (user_id, business_id, is_primary_admin, is_admin)

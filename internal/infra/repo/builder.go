@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+// builder.go provides updateBuilder, a small helper for constructing partial
+// "UPDATE ... SET" queries where only some columns are being written. It's
+// used by the repo methods that implement partial updates (e.g.
+// UpdateShiftById, UpdateLocationById).
+
 type updateBuilder struct {
 	args       []any
 	setClauses []string
@@ -18,7 +23,8 @@ func newUpdateBuilder() *updateBuilder {
 	return &updateBuilder{argIdx: 1}
 }
 
-// Adds a new "set clause" column and appends its value to the args slice that is returned from Build()
+// Add records column and value as a "set clause" to be included the next
+// time Build is called.
 func (b *updateBuilder) Add(column string, value any) {
 	b.args = append(b.args, value)
 	b.setClauses = append(b.setClauses, fmt.Sprintf("%s = $%d", column, b.argIdx))

@@ -8,6 +8,11 @@ import (
 	"github.com/dgrco/quikslate/internal/domain"
 )
 
+// EmployeeService manages which positions (job roles) a user is qualified
+// to work within a business. A LocationLead or Manager may edit an
+// employee's positions only if they share at least one location with that
+// employee; anything outside that overlap requires a business admin.
+
 type EmployeeService struct {
 	repo domain.Repo
 }
@@ -53,8 +58,8 @@ func (es *EmployeeService) validateEmployeePositionAction(ctx context.Context, t
 	return domain.ErrForbidden
 }
 
-// Add a Position to a User.
-// (Authorization: Admin, LocationLead, Manager)
+// AddPosition marks userId as qualified to work positionId. Authorization:
+// Admin, or a LocationLead/Manager who shares a location with userId.
 func (es *EmployeeService) AddPosition(
 	ctx context.Context,
 	userId,
@@ -81,8 +86,8 @@ func (es *EmployeeService) AddPosition(
 	return nil
 }
 
-// Remove a Position from a User
-// (Authorization: Admin)
+// RemovePosition revokes userId's qualification for positionId.
+// Authorization: Admin.
 func (es *EmployeeService) RemovePosition(
 	ctx context.Context,
 	userId,
@@ -109,8 +114,9 @@ func (es *EmployeeService) RemovePosition(
 	return nil
 }
 
-// Get all Positions at a Business for a User
-// (Authorization: Admin, LocationLead, Manager)
+// GetAllPositionsByUser lists every position userId is qualified to work
+// within the caller's business. Authorization: Admin, or a
+// LocationLead/Manager who shares a location with userId.
 func (es *EmployeeService) GetAllPositionsByUser(
 	ctx context.Context,
 	userId string,

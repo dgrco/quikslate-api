@@ -9,6 +9,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// location_roles_repo.go implements domain.LocationRoleRepository: managing
+// the per-location role (LocationLead, Manager, Employee) a business member
+// holds at a specific location.
+
 const (
 	assignRoleQuery = `
 		INSERT INTO location_roles (user_id, business_id, location_id, role)
@@ -115,7 +119,7 @@ func scanLocationRoleDetails(rows pgx.Rows) ([]domain.LocationRoleDetail, error)
 
 // AssignRole upserts userId's role at locationId: inserts a new row, or
 // updates the existing one's role if they already have one there (a user can
-// only hold a single role per location — see the (user_id, location_id)
+// only hold a single role per location, see the (user_id, location_id)
 // conflict target).
 func (r *PgRepository) AssignRole(ctx context.Context, userId, businessId string, locationId string, role domain.LRole) error {
 	_, err := r.exec.Exec(ctx, assignRoleQuery, userId, businessId, locationId, role)

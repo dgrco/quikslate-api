@@ -10,6 +10,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// refresh_tokens_repo.go implements domain.RefreshTokenRepository: storing
+// and looking up the hashed refresh tokens behind session renewal (see
+// api/CLAUDE.md's auth model for the rotate-on-use scheme).
+
 const (
 	createRefreshTokenQuery = `
 		INSERT INTO refresh_tokens (user_id, token, expires_at)
@@ -45,7 +49,7 @@ func scanRefreshToken(row pgx.Row) (domain.RefreshToken, error) {
 
 // CreateRefreshToken stores a refresh token record for userId. token is
 // expected to already be the SHA-256 hash of the raw token handed to the
-// client (see AuthService.hashToken) — the raw token itself is never
+// client (see AuthService.hashToken); the raw token itself is never
 // persisted.
 func (r *PgRepository) CreateRefreshToken(ctx context.Context, userId, token string, expiresAt time.Time) (domain.RefreshToken, error) {
 	t, err := scanRefreshToken(

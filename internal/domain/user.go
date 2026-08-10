@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+// User is an account holder. This file also has the validation and
+// normalization rules applied at registration, see
+// internal/service/auth.go.
+
 type User struct {
 	Id        string    `json:"id"`
 	Email     string    `json:"email"`

@@ -12,7 +12,9 @@ import (
 // authz.go implements domain.AuthzContextRepository: looking up a caller's
 // admin flags for a business and, for location-scoped calls, their role at a
 // location, so the service layer can authorize requests without embedding
-// that data in the JWT (see api/CLAUDE.md's auth model).
+// that data in the JWT. Resolving it per request is what makes a revoked
+// role or removed membership take effect immediately, rather than lingering
+// until the caller's access token expires.
 
 const (
 	getBusinessMemberAuthzQuery = `

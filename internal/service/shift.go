@@ -10,9 +10,9 @@ import (
 )
 
 // ShiftService manages the schedule: creating, updating, assigning, and
-// cancelling shifts at a location. Every method here is location-scoped,
-// so it requires a session under RequireLocationMember (see
-// api/CLAUDE.md), unlike most other services which are business-scoped.
+// cancelling shifts at a location. Every method here is location-scoped, so
+// it requires a session under RequireLocationMember (internal/handler/
+// middleware.go), unlike most other services which are business-scoped.
 
 type ShiftService struct {
 	repo domain.Repo

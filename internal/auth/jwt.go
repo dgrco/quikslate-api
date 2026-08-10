@@ -16,7 +16,7 @@ type AccessTokenClaims struct {
 
 // GenerateAccessToken signs a short-lived (15 min) JWT carrying only userId,
 // no roles or admin flags, since those are looked up fresh from the database
-// on every request instead of trusted from the token (see api/CLAUDE.md).
+// on every request instead of trusted from the token.
 func GenerateAccessToken(userId, secret string) (string, error) {
 	claims := AccessTokenClaims{
 		UserId: userId,

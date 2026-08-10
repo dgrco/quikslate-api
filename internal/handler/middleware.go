@@ -16,8 +16,10 @@ import (
 // This file implements the three chi auth middlewares that build up request
 // context via internal/ctxkeys, in increasing specificity: RequireIdentity
 // (userId only), RequireBusinessMember (adds business-scoped authz), and
-// RequireLocationMember (adds location-scoped authz). See api/CLAUDE.md for
-// which one to use for a given route.
+// RequireLocationMember (adds location-scoped authz). Pick the least
+// specific one a route's params allow: RequireIdentity when there is no
+// {businessId}, RequireBusinessMember when there is no {locationId}, and
+// RequireLocationMember only when the route has both.
 
 func parseAccessToken(r *http.Request, jwtSecret string) (*auth.AccessTokenClaims, error) {
 	header := r.Header.Get("Authorization")

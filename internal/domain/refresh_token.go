@@ -6,8 +6,7 @@ import (
 )
 
 // RefreshToken is the server-side record backing refresh-token-rotation
-// auth. See internal/service/auth.go for hashing and rotation, and
-// api/CLAUDE.md for the full auth model.
+// auth. See internal/service/auth.go for hashing and rotation.
 
 type RefreshToken struct {
 	Id        string

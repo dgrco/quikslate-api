@@ -11,8 +11,9 @@ import (
 )
 
 // refresh_tokens_repo.go implements domain.RefreshTokenRepository: storing
-// and looking up the hashed refresh tokens behind session renewal (see
-// api/CLAUDE.md's auth model for the rotate-on-use scheme).
+// and looking up the hashed refresh tokens behind session renewal. See
+// AuthService.Refresh in internal/service/auth.go for the rotate-on-use
+// scheme these queries back.
 
 const (
 	createRefreshTokenQuery = `

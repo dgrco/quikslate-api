@@ -15,7 +15,7 @@ import (
 
 // AuthService implements registration, login, refresh-token rotation, and
 // logout, plus the authorization-context lookups the auth middleware calls
-// on every request. See api/CLAUDE.md for the full auth model.
+// on every request.
 
 type AuthService struct {
 	repo      domain.Repo

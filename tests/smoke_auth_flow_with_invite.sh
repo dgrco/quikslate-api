@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-BASE="http://localhost:$API_PORT"
+# Every API route is mounted under /v1 (cmd/server/main.go), so the prefix
+# lives here rather than on each request below.
+BASE="http://localhost:$API_PORT/v1"
 
 # --- cleanup from any previous run, so this is safe to re-run ---
 docker compose exec postgres psql -U postgres -d "$DATABASE_URL" -c "DELETE FROM businesses WHERE name = 'Test Co';" > /dev/null

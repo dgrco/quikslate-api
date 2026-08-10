@@ -1,4 +1,4 @@
-basePath: /
+basePath: /v1
 definitions:
   github_com_dgrco_quikslate_internal_domain.EmployeePosition:
     properties:

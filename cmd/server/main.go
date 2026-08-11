@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	_ "time/tzdata"
 
 	_ "github.com/dgrco/quikslate/docs"
 	"github.com/dgrco/quikslate/internal/config"

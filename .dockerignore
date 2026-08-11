@@ -2,4 +2,4 @@
 .env.api
 .env.migrate
 .env.local
-dist
+.git

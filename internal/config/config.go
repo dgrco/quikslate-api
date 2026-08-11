@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"github.com/joho/godotenv"
 	"log"
 	"os"
 	"strings"
@@ -17,6 +18,8 @@ type Config struct {
 
 // Load collects a set of environment variables based on Config; panics if required variables are not set
 func Load() *Config {
+	_ = godotenv.Load(".env.local", ".env.api")
+
 	return &Config{
 		ApiPort:     getEnv("API_PORT", "8080"),
 		DatabaseUrl: mustGetEnv("DATABASE_URL"),

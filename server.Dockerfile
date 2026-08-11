@@ -9,4 +9,6 @@ RUN mkdir -p dist && CGO_ENABLED=0 go build -ldflags="-s -w" -o dist ./cmd/serve
 FROM alpine:3.24.1 AS final
 WORKDIR /app
 COPY --from=build app/dist/server .
+RUN adduser -D -u 10001 appuser
+USER appuser
 CMD ["./server"]

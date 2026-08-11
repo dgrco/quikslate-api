@@ -18,7 +18,9 @@ type Config struct {
 
 // Load collects a set of environment variables based on Config; panics if required variables are not set
 func Load() *Config {
-	_ = godotenv.Load(".env.local", ".env.api")
+	// Host runs only. .env is excluded from images, so in a container this
+	// finds nothing and the values Compose set are already in the environment.
+	_ = godotenv.Load(".env")
 
 	return &Config{
 		ApiPort:     getEnv("API_PORT", "8080"),

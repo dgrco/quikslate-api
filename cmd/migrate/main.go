@@ -17,7 +17,7 @@ import (
 var embedMigrations embed.FS
 
 func main() {
-	_ = godotenv.Load(".env.local", ".env.migrate")
+	_ = godotenv.Load(".env")
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
 		log.Fatal("DATABASE_URL is required")

@@ -1,16 +1,55 @@
+# All values come from .env, which Compose reads automatically. The
+# environment: blocks below are the record of which service sees what: migrate
+# never receives JWT_SECRET, and the two DATABASE_URLs use different Postgres
+# roles so the API cannot create or alter tables.
 services:
+  api:
+    build:
+      dockerfile: server.Dockerfile
+    image: quikslate-api
+    environment:
+      DATABASE_URL: postgres://quikslate_api:${API_PASSWORD}@postgres:5432/quikslate?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET}
+      API_PORT: ${API_PORT}
+      SECURE_MODE: ${SECURE_MODE}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "8079:8080"
+    restart: unless-stopped
+
+  migrate:
+    build:
+      dockerfile: migrate.Dockerfile
+    image: quikslate-migrate
+    environment:
+      DATABASE_URL: postgres://quikslate_migrate:${MIGRATE_PASSWORD}@postgres:5432/quikslate?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   postgres:
     image: postgres:16-alpine
-    env_file:
-      - .env
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: quikslate
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Read by initdb/01-roles.sh, on first boot only.
+      QUIKSLATE_MIGRATE_PASSWORD: ${MIGRATE_PASSWORD}
+      QUIKSLATE_API_PASSWORD: ${API_PASSWORD}
     ports:
-      # Bound to loopback only. Without the 127.0.0.1 prefix Docker publishes
-      # on 0.0.0.0, putting the database on every network this machine is
-      # attached to. The API reaches it over localhost, so nothing else needs
-      # access — phones and other devices talk to the API, never to Postgres.
       - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
 volumes:
   postgres_data:

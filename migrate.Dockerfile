@@ -10,5 +10,5 @@ FROM alpine:3.24.1 AS final
 WORKDIR /app
 COPY --from=build app/dist/migrate .
 RUN adduser -D -u 10001 appuser
-USER appuser
+USER 10001:10001
 CMD ["./migrate"]

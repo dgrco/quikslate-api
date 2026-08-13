@@ -1,9 +1,14 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"os/signal"
+	"syscall"
+	"time"
 	_ "time/tzdata"
 
 	_ "github.com/dgrco/quikslate/docs"
@@ -11,6 +16,7 @@ import (
 	"github.com/dgrco/quikslate/internal/database"
 	"github.com/dgrco/quikslate/internal/handler"
 	"github.com/dgrco/quikslate/internal/infra/repo"
+	"github.com/dgrco/quikslate/internal/response"
 	"github.com/dgrco/quikslate/internal/service"
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
@@ -32,6 +38,10 @@ import (
 func main() {
 	// Load environment
 	cfg := config.Load()
+
+	// Set up SIGINT/SIGTERM catching context
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	// Connect to database
 	pool, err := database.Connect(cfg.DatabaseUrl)
@@ -97,8 +107,25 @@ func main() {
 	// like a routing change.
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("Hi from Quikslate :)"))
+			response.WriteJSON(w, handler.SimpleResponse{Message: "Hi from Quikslate :)"}, http.StatusOK)
 		})
+
+		// Health endpoint(s)
+		r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
+			if err := pool.Ping(r.Context()); err != nil {
+				response.WriteError(w, "unhealthy", http.StatusInternalServerError)
+				return
+			}
+			response.WriteJSON(w, handler.SimpleResponse{Message: "ok"}, http.StatusOK)
+		})
+		r.Head("/healthz", func(w http.ResponseWriter, r *http.Request) {
+			if err := pool.Ping(r.Context()); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		})
+
 
 		// Swagger UI + spec, served at /v1/swagger/index.html
 		r.Get("/swagger/*", httpSwagger.WrapHandler)
@@ -114,8 +141,39 @@ func main() {
 	})
 
 	// Listen
-	log.Printf("Server started on port %s", cfg.ApiPort)
-	if err := http.ListenAndServe(fmt.Sprintf(":%s", cfg.ApiPort), r); err != nil {
-		log.Fatalf("Server failed to start: %v", err)
+	server := http.Server{
+		Addr:              fmt.Sprintf(":%s", cfg.ApiPort),
+		Handler:           r,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second, // Max duration reading the entire request
+		WriteTimeout:      15 * time.Second, // Max duration writing the response
+		IdleTimeout:       60 * time.Second, // Max time to keep connections alive
 	}
+
+	// Run ListenAndServe in a Goroutine to not block main
+	go func() {
+		log.Printf("Server started on port %s", cfg.ApiPort)
+		// http.ErrServerClosed check is done since server.Shutdown() makes ListenAndServe()
+		// return it, so it is expected.
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("Server error: %v", err)
+		}
+	}()
+
+	// Block until signalled
+	<-ctx.Done()
+	log.Println("Shutdown signal received.")
+
+	// Restore default signal behaviour, this makes Ctrl+C twice force exit.
+	stop()
+
+	// Set up shutdown context: this gives in-flight requests time to finish
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("Failed to shutdown server: %v", err)
+	}
+
+	log.Println("Server shutdown successfully.")
 }

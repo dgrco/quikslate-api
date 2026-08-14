@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -19,10 +20,13 @@ type Position struct {
 }
 
 // ValidatePositionName returns an error if positionName is empty or
-// all-whitespace.
+// all-whitespace, or if its too long.
 func ValidatePositionName(positionName string) error {
 	if strings.TrimSpace(positionName) == "" {
 		return NewValidationError("position name cannot be empty")
+	}
+	if len(positionName) > MAX_POSITION_NAME_LEN {
+		return NewValidationError(fmt.Sprintf("position name must be less than %d characters", MAX_POSITION_NAME_LEN))
 	}
 	return nil
 }

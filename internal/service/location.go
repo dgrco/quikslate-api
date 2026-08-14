@@ -39,6 +39,12 @@ func (ls *LocationService) CreateLocation(
 		return domain.Location{}, fmt.Errorf("failed to create location: %w", err)
 	}
 
+	if address != nil {
+		if err := domain.ValidateLocationAddr(*address); err != nil {
+			return domain.Location{}, fmt.Errorf("failed to create location: %w", err)
+		}
+	}
+
 	if err := domain.ValidateTimezone(timezone); err != nil {
 		return domain.Location{}, fmt.Errorf("failed to create location: %w", err)
 	}
@@ -88,6 +94,11 @@ func (ls *LocationService) UpdateLocation(
 	}
 	if err := domain.ValidateLocationName(update.Name); err != nil {
 		return fmt.Errorf("failed to update location: %w", err)
+	}
+	if update.Address != nil {
+		if err := domain.ValidateLocationAddr(*update.Address); err != nil {
+			return fmt.Errorf("failed to update location: %w", err)
+		}
 	}
 	if err := domain.ValidateTimezone(update.Timezone); err != nil {
 		return fmt.Errorf("failed to update location: %w", err)

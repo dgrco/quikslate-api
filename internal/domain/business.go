@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -17,10 +18,13 @@ type Business struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// ValidateBusinessName returns an error if the businessName is empty
+// ValidateBusinessName returns an error if the businessName is empty or if its too long
 func ValidateBusinessName(businessName string) error {
 	if strings.TrimSpace(businessName) == "" {
 		return NewValidationError("business name cannot be empty")
+	}
+	if len(businessName) > MAX_BUSINESS_NAME_LEN {
+		return NewValidationError(fmt.Sprintf("business name must be less than %d characters", MAX_BUSINESS_NAME_LEN))
 	}
 	return nil
 }

@@ -23,10 +23,21 @@ type Location struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
-// ValidateLocationName returns an error if the locationName is empty
+// ValidateLocationName returns an error if the locationName is empty or is too long
 func ValidateLocationName(locationName string) error {
 	if strings.TrimSpace(locationName) == "" {
 		return NewValidationError("location name cannot be empty")
+	}
+	if len(locationName) > MAX_LOCATION_NAME_LEN {
+		return NewValidationError(fmt.Sprintf("location name must be less than %d characters", MAX_LOCATION_NAME_LEN))
+	}
+	return nil
+}
+
+// ValidateLocationAddr returns an error if the addr is too long
+func ValidateLocationAddr(addr string) error {
+	if len(addr) > MAX_LOCATION_ADDR_LEN {
+		return NewValidationError(fmt.Sprintf("location address must be less than %d characters", MAX_LOCATION_ADDR_LEN))
 	}
 	return nil
 }

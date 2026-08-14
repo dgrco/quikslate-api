@@ -1,0 +1,10 @@
+package domain
+
+const (
+	MAX_BUSINESS_NAME_LEN = 256
+	MAX_LOCATION_NAME_LEN = 256
+	MAX_LOCATION_ADDR_LEN = 256
+	MAX_POSITION_NAME_LEN = 256
+	MAX_USER_NAME_LEN     = 256
+	MAX_USER_EMAIL_LEN    = 254 // widely accepted as safe maximum
+)

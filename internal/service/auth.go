@@ -41,8 +41,8 @@ func (s *AuthService) Register(ctx context.Context, email, name, password string
 	// Normalize email
 	email = domain.NormalizeEmail(email)
 
-	// validate email and password
-	if err := domain.ValidateUserRegistrationCredentials(email, password); err != nil {
+	// validate email, name and password
+	if err := domain.ValidateUserRegistrationCredentials(email, name, password); err != nil {
 		return nil, err
 	}
 

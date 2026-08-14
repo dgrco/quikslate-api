@@ -17,18 +17,18 @@ import (
 
 const (
 	createRefreshTokenQuery = `
-		INSERT INTO refresh_tokens (user_id, token, expires_at)
+		INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
 		VALUES ($1, $2, $3)
-		RETURNING id, user_id, token, expires_at, created_at
+		RETURNING id, user_id, token_hash, expires_at, created_at
 	`
 	getRefreshTokenQuery = `
-		SELECT id, user_id, token, expires_at, created_at
+		SELECT id, user_id, token_hash, expires_at, created_at
 		FROM refresh_tokens
-		WHERE token = $1
+		WHERE token_hash = $1
 	`
 	deleteRefreshTokenQuery = `
 		DELETE FROM refresh_tokens
-		WHERE token = $1
+		WHERE token_hash = $1
 	`
 )
 
@@ -52,9 +52,9 @@ func scanRefreshToken(row pgx.Row) (domain.RefreshToken, error) {
 // expected to already be the SHA-256 hash of the raw token handed to the
 // client (see AuthService.hashToken); the raw token itself is never
 // persisted.
-func (r *PgRepository) CreateRefreshToken(ctx context.Context, userId, token string, expiresAt time.Time) (domain.RefreshToken, error) {
+func (r *PgRepository) CreateRefreshToken(ctx context.Context, userId, tokenHash string, expiresAt time.Time) (domain.RefreshToken, error) {
 	t, err := scanRefreshToken(
-		r.exec.QueryRow(ctx, createRefreshTokenQuery, userId, token, expiresAt),
+		r.exec.QueryRow(ctx, createRefreshTokenQuery, userId, tokenHash, expiresAt),
 	)
 	if err != nil {
 		return domain.RefreshToken{}, fmt.Errorf("failed to create refresh token: %w", err)

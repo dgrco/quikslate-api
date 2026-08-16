@@ -180,7 +180,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		http.SetCookie(w, &http.Cookie{
 			Name:     "refresh_token",
 			Value:    "",
-			Path:     "/auth",
+			Path:     "/v1/auth",
 			HttpOnly: true,
 			Secure:   h.secure,
 			SameSite: http.SameSiteLaxMode,

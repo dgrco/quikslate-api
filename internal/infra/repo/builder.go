@@ -31,7 +31,7 @@ func (b *updateBuilder) Add(column string, value any) {
 	b.argIdx++
 }
 
-// Build builds the final query and returns the args slice
+// Build builds the final query and returns the args slice.
 // NOTE: this adds the updated_at column automatically!
 func (b *updateBuilder) Build(table, idColumn string, id any) (string, []any) {
 	b.Add("updated_at", time.Now())

@@ -56,7 +56,7 @@ func main() {
 
 	// Auth service/handler
 	authService := service.NewAuthService(pgRepo, cfg.JWTSecret)
-	authHandler := handler.NewAuthHandler(authService, cfg.IsSecureMode(), cfg.JWTSecret)
+	authHandler := handler.NewAuthHandler(authService, cfg.JWTSecret, cfg.IsSecureMode())
 
 	// Other service/handlers
 	businessService := service.NewBusinessService(pgRepo)
@@ -79,6 +79,9 @@ func main() {
 
 	locationRoleService := service.NewLocationRoleService(pgRepo)
 	locationRoleHandler := handler.NewLocationRoleHandler(locationRoleService, authService, cfg.JWTSecret)
+
+	userService := service.NewUserService(pgRepo)
+	userHandler := handler.NewUserHandler(userService, authService, cfg.JWTSecret, cfg.IsSecureMode())
 
 	// Setup router
 	r := chi.NewRouter()
@@ -126,9 +129,11 @@ func main() {
 			w.WriteHeader(http.StatusOK)
 		})
 
-
-		// Swagger UI + spec, served at /v1/swagger/index.html
-		r.Get("/swagger/*", httpSwagger.WrapHandler)
+		// Swagger UI + spec, served at /v1/swagger/index.html. Only exposed
+		// outside secure mode, so prod doesn't hand out a route map for free.
+		if !cfg.IsSecureMode() {
+			r.Get("/swagger/*", httpSwagger.WrapHandler)
+		}
 
 		authHandler.SetupRoutes(r)
 		businessHandler.SetupRoutes(r)
@@ -138,6 +143,7 @@ func main() {
 		shiftHandler.SetupRoutes(r)
 		employeeHandler.SetupRoutes(r)
 		locationRoleHandler.SetupRoutes(r)
+		userHandler.SetupRoutes(r)
 	})
 
 	// Listen

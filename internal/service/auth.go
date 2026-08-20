@@ -137,6 +137,47 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
 	return s.repo.DeleteRefreshToken(ctx, hashedToken)
 }
 
+// CreatePasswordResetToken generates and hashes a password reset token.
+// It also revokes all prior password reset tokens belonging to the user.
+func (s *AuthService) CreatePasswordResetToken(ctx context.Context, email string) (string, error) {
+	token, err := generateSecureToken(32)
+	if err != nil {
+		return "", fmt.Errorf("failed to reset password: %w", err)
+	}
+
+	tokenHash := hashToken(token)
+
+	u, err := s.repo.GetUserByEmail(ctx, email)
+	if err != nil {
+		return "", fmt.Errorf("failed to reset password: %w", err)
+	}
+
+	// @note: this allows concurrent resets to work.
+	// I may make GetUserByEmail a locking operation (FOR UPDATE)
+
+	tx, err := s.repo.BeginTransaction(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to reset password: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	txRepo := s.repo.WithTx(tx)
+
+	if err := txRepo.RevokePasswordResetTokensByUserId(ctx, u.Id); err != nil {
+		return "", fmt.Errorf("failed to reset password: %w", err)
+	}
+
+	if _, err = txRepo.CreatePasswordResetToken(ctx, u.Id, tokenHash, time.Now().Add(15*time.Minute)); err != nil {
+		return "", fmt.Errorf("failed to reset password: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return "", fmt.Errorf("failed to reset password: %w", err)
+	}
+
+	return token, nil
+}
+
 // generateTokens creates a JWT and a refresh token for a given user
 func (s *AuthService) generateTokens(
 	ctx context.Context,

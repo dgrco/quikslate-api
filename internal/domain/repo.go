@@ -25,6 +25,7 @@ type Repo interface {
 	EmployeePositionRepository
 	InviteRepository
 	AuthzContextRepository
+	PasswordResetTokenRepository
 
 	// Transaction Functions
 	BeginTransaction(ctx context.Context) (Tx, error)

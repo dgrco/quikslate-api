@@ -47,12 +47,12 @@ func main() {
 		if err := goose.Up(db, "migrations"); err != nil {
 			log.Fatalf("failed to migrate up: %v", err)
 		}
-	log.Println("migrate up succeeded")
+		log.Println("migrate up succeeded")
 	case "down":
 		if err := goose.Down(db, "migrations"); err != nil {
 			log.Fatalf("failed to migrate down (by 1): %v", err)
 		}
-	log.Println("migrate down succeeded")
+		log.Println("migrate down succeeded")
 	case "reset":
 		if err := goose.Reset(db, "migrations"); err != nil {
 			log.Fatalf("failed to reset migrations: %v", err)

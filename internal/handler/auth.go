@@ -21,17 +21,17 @@ import (
 
 type AuthHandler struct {
 	authService *service.AuthService
-	secure      bool // should be true in production and false in development (set in Config.SecureMode)
 	jwtSecret   string
+	secure      bool // should be true in production and false in development (set in Config.SecureMode)
 }
 
 // NewAuthHandler creates an AuthHandler object.
 // The secure parameter refers to whether we are in a prod or dev environment.
-func NewAuthHandler(authService *service.AuthService, secure bool, jwtSecret string) *AuthHandler {
+func NewAuthHandler(authService *service.AuthService, jwtSecret string, secure bool) *AuthHandler {
 	return &AuthHandler{
 		authService,
-		secure,
 		jwtSecret,
+		secure,
 	}
 }
 
@@ -46,6 +46,11 @@ type registerRequest struct {
 type loginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+}
+
+type changePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
 }
 
 // Response Structures
@@ -165,6 +170,18 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, TokenResponse{AccessToken: authResult.AccessToken}, http.StatusOK)
 }
 
+func ClearCookie(w http.ResponseWriter, secure bool) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		Path:     "/v1/auth",
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1, // set the cookie as expired
+	})
+}
+
 // Logout revokes the current refresh token and clears its cookie.
 //
 //	@Summary		Logout
@@ -176,21 +193,9 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
-	clearCookie := func() {
-		http.SetCookie(w, &http.Cookie{
-			Name:     "refresh_token",
-			Value:    "",
-			Path:     "/v1/auth",
-			HttpOnly: true,
-			Secure:   h.secure,
-			SameSite: http.SameSiteLaxMode,
-			MaxAge:   -1, // set the cookie as expired
-		})
-	}
-
 	cookie, err := r.Cookie("refresh_token")
 	if err != nil {
-		clearCookie() // harmless if already absent, ensures consistent response
+		ClearCookie(w, h.secure) // harmless if already absent, ensures consistent response
 		response.WriteJSON(w, SimpleResponse{Message: "ok"}, http.StatusOK)
 		return
 	}
@@ -204,7 +209,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clearCookie()
+	ClearCookie(w, h.secure)
 	response.WriteJSON(w, SimpleResponse{Message: "ok"}, http.StatusOK)
 }
 
@@ -230,7 +235,7 @@ func (h *AuthHandler) SetupRoutes(r chi.Router) {
 	r.Route("/auth", func(r chi.Router) {
 		// rate-limit by IP (may add per-email rate-limiting via redis in the future)
 		r.Group(func(r chi.Router) {
-			r.Use(httprate.LimitByIP(10, 1*time.Minute))
+			r.Use(httprate.LimitByRealIP(60, 1*time.Minute))
 			r.Post("/register", h.Register)
 			r.Post("/login", h.Login)
 		})

@@ -7,4 +7,6 @@ const (
 	MAX_POSITION_NAME_LEN = 256
 	MAX_USER_NAME_LEN     = 256
 	MAX_USER_EMAIL_LEN    = 254 // widely accepted as safe maximum
+	MAX_USER_PASSWORD_LEN = 72
+	MIN_USER_PASSWORD_LEN = 8
 )

@@ -138,7 +138,13 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
 }
 
 // CreatePasswordResetToken generates and hashes a password reset token.
-// It also revokes all prior password reset tokens belonging to the user.
+// It also revokes all prior password reset tokens belonging to the user, so a
+// user has at most one outstanding token at a time.
+//
+// An email with no account is not an error: it returns ("", nil), so callers
+// must treat an empty token as "nothing to send" rather than as success with a
+// token. Reporting ErrNotFound here would turn the endpoint into an account
+// enumeration oracle.
 func (s *AuthService) CreatePasswordResetToken(ctx context.Context, email string) (string, error) {
 	token, err := generateSecureToken(32)
 	if err != nil {
@@ -147,8 +153,18 @@ func (s *AuthService) CreatePasswordResetToken(ctx context.Context, email string
 
 	tokenHash := hashToken(token)
 
+	// Registration lowercases before storing and GetUserByEmail matches
+	// exactly, so skipping this silently finds no account for any address the
+	// user capitalized -- and the no-account path is intentionally quiet.
+	email = domain.NormalizeEmail(email)
+
 	u, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
+		// Don't leak account existence: no account means no token to mail, but
+		// the caller still reports the same success it would for a real one.
+		if errors.Is(err, domain.ErrNotFound) {
+			return "", nil
+		}
 		return "", fmt.Errorf("failed to reset password: %w", err)
 	}
 
@@ -176,6 +192,74 @@ func (s *AuthService) CreatePasswordResetToken(ctx context.Context, email string
 	}
 
 	return token, nil
+}
+
+// UsePasswordResetToken changes the user's password and marks the token as being 'used'.
+// An already-used token cannot be used again (enforced by DB query).
+// If the newPassword is the same as the old (via DB lookup -> CheckPassword()) return an error.
+func (s *AuthService) UsePasswordResetToken(ctx context.Context, newPassword, token string) error {
+	if err := domain.ValidateUserPassword(newPassword); err != nil {
+		return err
+	}
+
+	tokenHash := hashToken(token)
+	passwordHash, err := auth.HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("failed to use password reset token: %w", err)
+	}
+
+	tx, err := s.repo.BeginTransaction(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to use password reset token: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	txRepo := s.repo.WithTx(tx)
+
+	// token validation
+
+	tok, err := txRepo.GetPasswordResetToken(ctx, tokenHash)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return domain.ErrInvalidPasswordResetToken
+		}
+		return fmt.Errorf("failed to use password reset token: %w", err)
+	}
+
+	u, err := txRepo.GetUserById(ctx, tok.UserId)
+	if err != nil {
+		return fmt.Errorf("failed to use password reset token: %w", err)
+	}
+
+	if auth.CheckPassword(newPassword, u.Password) {
+		return domain.ErrSamePassword
+	}
+
+	// mark as used
+
+	// the conditional UPDATE (used_at IS NULL AND expires_at > NOW()) is the
+	// atomic consume: a concurrent redemption blocks on the row lock, then
+	// re-evaluates the predicate and comes back with no rows affected.
+	if err := txRepo.UsePasswordResetToken(ctx, tokenHash); err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return domain.ErrInvalidPasswordResetToken
+		}
+		return fmt.Errorf("failed to use password reset token: %w", err)
+	}
+
+	// change password
+
+	if err := txRepo.UpdateUser(ctx, tok.UserId, domain.UserUpdate{Password: &passwordHash}); err != nil {
+		return fmt.Errorf("failed to use password reset token: %w", err)
+	}
+
+	// clear existing refresh tokens for the user
+
+	if err := txRepo.RevokeRefreshTokensByUserId(ctx, u.Id); err != nil {
+		return fmt.Errorf("failed to use password reset token: %w", err)
+	}
+
+	return tx.Commit(ctx)
 }
 
 // generateTokens creates a JWT and a refresh token for a given user

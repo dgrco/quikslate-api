@@ -15,6 +15,46 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/auth/forgot-password": {
+            "post": {
+                "description": "Request a password reset link. Always returns 202 whether or not the address has an account, so the response cannot be used to discover which emails are registered.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Forgot Password",
+                "parameters": [
+                    {
+                        "description": "Email to send the reset link to",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler.forgotPasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler.SimpleResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid body or missing email",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/login": {
             "post": {
                 "description": "Authenticate with email and password. Returns an access_token and sets a refresh_token cookie.",
@@ -152,6 +192,46 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "email already registered",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/reset-password": {
+            "post": {
+                "description": "Consume a password reset token, set a new password, revoke every refresh token for the user, and clear the refresh_token cookie. The token is single-use.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Reset Password",
+                "parameters": [
+                    {
+                        "description": "Reset token and new password",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler.resetPasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler.SimpleResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid body, missing fields, unusable token, or password rejected",
                         "schema": {
                             "$ref": "#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse"
                         }
@@ -3094,6 +3174,14 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_handler.forgotPasswordRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                }
+            }
+        },
         "internal_handler.loginRequest": {
             "type": "object",
             "properties": {
@@ -3131,6 +3219,17 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_handler.resetPasswordRequest": {
+            "type": "object",
+            "properties": {
+                "new_password": {
+                    "type": "string"
+                },
+                "token": {
                     "type": "string"
                 }
             }

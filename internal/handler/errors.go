@@ -55,6 +55,13 @@ func handleServiceError(w http.ResponseWriter, err error, fnName string) {
 		return
 	}
 
+	// 400 rather than 401: the caller is anonymous here, and the remedy is to
+	// request a new reset link, not to authenticate and retry.
+	if errors.Is(err, domain.ErrInvalidPasswordResetToken) {
+		response.WriteError(w, ERR_INVALID_PASSWORD_RESET_TOKEN, http.StatusBadRequest)
+		return
+	}
+
 	if errors.Is(err, domain.ErrInvalidShiftTimes) {
 		response.WriteError(w, ERR_INVALID_SHIFT_TIMES, http.StatusBadRequest)
 		return
@@ -76,15 +83,16 @@ func handleServiceError(w http.ResponseWriter, err error, fnName string) {
 }
 
 const (
-	ERR_INVALID_REQ_BODY      = "invalid request body"
-	ERR_INTERNAL_SERVER       = "internal server error"
-	ERR_NOT_FOUND             = "not found"
-	ERR_FORBIDDEN             = "forbidden"
-	ERR_UNAUTHORIZED          = "unauthorized"
-	ERR_INVALID_REFRESH_TOKEN = "invalid refresh token"
-	ERR_ALREADY_EXISTS        = "already exists"
-	ERR_INVALID_CREDENTIALS   = "invalid credentials"
-	ERR_INVALID_SHIFT_TIMES   = "invalid shift times"
-	ERR_SHIFT_OVERLAP         = "shift overlaps an existing shift for this user"
-	ERR_LAST_ADMIN_REMOVAL    = "cannot remove last admin"
+	ERR_INVALID_REQ_BODY             = "invalid request body"
+	ERR_INTERNAL_SERVER              = "internal server error"
+	ERR_NOT_FOUND                    = "not found"
+	ERR_FORBIDDEN                    = "forbidden"
+	ERR_UNAUTHORIZED                 = "unauthorized"
+	ERR_INVALID_REFRESH_TOKEN        = "invalid refresh token"
+	ERR_INVALID_PASSWORD_RESET_TOKEN = "invalid password reset token"
+	ERR_ALREADY_EXISTS               = "already exists"
+	ERR_INVALID_CREDENTIALS          = "invalid credentials"
+	ERR_INVALID_SHIFT_TIMES          = "invalid shift times"
+	ERR_SHIFT_OVERLAP                = "shift overlaps an existing shift for this user"
+	ERR_LAST_ADMIN_REMOVAL           = "cannot remove last admin"
 )

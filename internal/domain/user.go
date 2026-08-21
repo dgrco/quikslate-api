@@ -59,7 +59,7 @@ func ValidateUserPassword(password string) error {
 // ValidateUserPasswordChange checks if a password change is valid (old != new)
 func ValidateUserPasswordChange(oldPass, newPass string) error {
 	if oldPass == newPass {
-		return NewValidationError("you cannot use the same password")
+		return ErrSamePassword
 	}
 	return nil
 }

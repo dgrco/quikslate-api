@@ -53,6 +53,15 @@ type changePasswordRequest struct {
 	NewPassword     string `json:"new_password"`
 }
 
+type forgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
+type resetPasswordRequest struct {
+	Token       string `json:"token"`
+	NewPassword string `json:"new_password"`
+}
+
 // Response Structures
 
 type TokenResponse struct {
@@ -213,6 +222,90 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, SimpleResponse{Message: "ok"}, http.StatusOK)
 }
 
+// ForgotPassword issues a password reset token for an email address.
+//
+//	@Summary		Forgot Password
+//	@Description	Request a password reset link. Always returns 202 whether or not the address has an account, so the response cannot be used to discover which emails are registered.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		forgotPasswordRequest	true	"Email to send the reset link to"
+//	@Success		202		{object}	SimpleResponse
+//	@Failure		400		{object}	response.errorResponse	"invalid body or missing email"
+//	@Router			/auth/forgot-password [post]
+func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
+
+	var req forgotPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(w, ERR_INVALID_REQ_BODY, http.StatusBadRequest)
+		return
+	}
+
+	if isEmpty(req.Email) {
+		response.WriteError(w, "email is required", http.StatusBadRequest)
+		return
+	}
+
+	token, err := h.authService.CreatePasswordResetToken(r.Context(), req.Email)
+	if err != nil {
+		handleServiceError(w, err, "forgot password")
+		return
+	}
+
+	// An empty token means the address has no account. Fall through to the
+	// same 202 rather than branching, so the two cases are indistinguishable.
+	if token != "" {
+		// TODO: hand the token to a mailer. Until one exists the reset link
+		// can only be retrieved out of band, so log it in development only —
+		// a reset token in a production log is a credential sitting in
+		// plaintext for anyone with log access.
+		if !h.secure {
+			log.Printf("forgot password: reset token for %s: %s", req.Email, token)
+		}
+	}
+
+	response.WriteJSON(w, SimpleResponse{Message: "if that email has an account, a reset link has been sent"}, http.StatusAccepted)
+}
+
+// ResetPassword consumes a password reset token and sets a new password.
+//
+//	@Summary		Reset Password
+//	@Description	Consume a password reset token, set a new password, revoke every refresh token for the user, and clear the refresh_token cookie. The token is single-use.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		resetPasswordRequest	true	"Reset token and new password"
+//	@Success		200		{object}	SimpleResponse
+//	@Failure		400		{object}	response.errorResponse	"invalid body, missing fields, unusable token, or password rejected"
+//	@Router			/auth/reset-password [post]
+func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
+
+	var req resetPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(w, ERR_INVALID_REQ_BODY, http.StatusBadRequest)
+		return
+	}
+
+	if isEmpty(req.Token) || isEmpty(req.NewPassword) {
+		response.WriteError(w, "token and new_password are required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.authService.UsePasswordResetToken(r.Context(), req.NewPassword, req.Token); err != nil {
+		handleServiceError(w, err, "reset password")
+		return
+	}
+
+	// The service revoked every refresh token for the user, so whatever this
+	// browser is still holding is dead. Clear it rather than leaving a cookie
+	// that only fails on the next refresh.
+	ClearCookie(w, h.secure)
+
+	response.WriteJSON(w, SimpleResponse{Message: "ok"}, http.StatusOK)
+}
+
 func setRefreshTokenCookie(w http.ResponseWriter, token string, secure bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
@@ -238,6 +331,15 @@ func (h *AuthHandler) SetupRoutes(r chi.Router) {
 			r.Use(httprate.LimitByRealIP(60, 1*time.Minute))
 			r.Post("/register", h.Register)
 			r.Post("/login", h.Login)
+		})
+
+		// Tighter limit than register/login: these two are the enumeration and
+		// password-guessing surface (a held reset token can otherwise probe the
+		// current password indefinitely via the same-password rejection).
+		r.Group(func(r chi.Router) {
+			r.Use(httprate.LimitByRealIP(10, 1*time.Minute))
+			r.Post("/forgot-password", h.ForgotPassword)
+			r.Post("/reset-password", h.ResetPassword)
 		})
 
 		r.Post("/refresh", h.Refresh)

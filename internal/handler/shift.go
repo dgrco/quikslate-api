@@ -11,18 +11,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// This file implements the shift handler: creating, reading, listing,
-// updating, assigning, unassigning, cancelling, and deleting shifts at a
-// location.
-
 type ShiftHandler struct {
 	shiftService *service.ShiftService
 	authService  *service.AuthService
 	jwtSecret    string
 }
 
-// NewShiftHandler constructs a ShiftHandler backed by shiftService and
-// authService.
 func NewShiftHandler(
 	shiftService *service.ShiftService,
 	authService *service.AuthService,
@@ -34,8 +28,6 @@ func NewShiftHandler(
 		jwtSecret,
 	}
 }
-
-// Request Body Structures
 
 type createShiftRequest struct {
 	PositionId string             `json:"position_id"`
@@ -56,8 +48,6 @@ type assignShiftRequest struct {
 	UserId string `json:"user_id"`
 }
 
-// Response Structures
-
 type SingleShiftResponse struct {
 	Shift domain.Shift `json:"shift"`
 }
@@ -65,8 +55,6 @@ type SingleShiftResponse struct {
 type MultipleShiftResponse struct {
 	Shifts []domain.ShiftDetail `json:"shifts"`
 }
-
-// Handlers
 
 // CreateShift creates a new shift under the location identified by locationId.
 //

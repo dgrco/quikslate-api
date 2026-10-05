@@ -9,29 +9,31 @@ import (
 )
 
 type Config struct {
-	ApiPort     string
-	DatabaseUrl string
-	JWTSecret   string
-	SecureMode  string
-	CorsOrigins string
+	ApiPort         string
+	DatabaseUrl     string
+	JWTSecret       string
+	SecureMode      string
+	CorsOrigins     string
+	Mailer          string
+	FrontendBaseURL string
 }
 
-// Load collects a set of environment variables based on Config; panics if required variables are not set
 func Load() *Config {
 	// Host runs only. .env is excluded from images, so in a container this
 	// finds nothing and the values Compose set are already in the environment.
 	_ = godotenv.Load(".env")
 
 	return &Config{
-		ApiPort:     getEnv("API_PORT", "8080"),
-		DatabaseUrl: mustGetEnv("DATABASE_URL"),
-		JWTSecret:   mustGetEnv("JWT_SECRET"),
-		SecureMode:  getEnv("SECURE_MODE", "true"),
-		CorsOrigins: getEnv("CORS_ORIGINS", "http://localhost:5173"),
+		ApiPort:         getEnv("API_PORT", "8080"),
+		DatabaseUrl:     mustGetEnv("DATABASE_URL"),
+		JWTSecret:       mustGetEnv("JWT_SECRET"),
+		SecureMode:      getEnv("SECURE_MODE", "true"),
+		CorsOrigins:     getEnv("CORS_ORIGINS", "http://localhost:5173"),
+		Mailer:          mustGetEnv("MAILER"),
+		FrontendBaseURL: mustGetEnv("FRONTEND_BASE_URL"),
 	}
 }
 
-// CorsOriginList splits the comma-separated CorsOrigins value into a slice, trimming whitespace.
 func (c *Config) CorsOriginList() []string {
 	origins := strings.Split(c.CorsOrigins, ",")
 	for i, o := range origins {
@@ -40,7 +42,8 @@ func (c *Config) CorsOriginList() []string {
 	return origins
 }
 
-// IsSecureMode is a safe way to extract a boolean from the SecureMode string value.
+// IsSecureMode fails safe: anything other than an explicit "false" counts
+// as production.
 func (c *Config) IsSecureMode() bool {
 	secureModeStr := strings.ToLower(c.SecureMode)
 	if secureModeStr == "false" {
@@ -50,14 +53,12 @@ func (c *Config) IsSecureMode() bool {
 		return true
 	}
 
-	// Warn about malformed value
 	log.Println(
 		"WARNING: environment variable SECURE_MODE is not set to either 'true' or 'false', defaulting to true...",
 	)
 	return true
 }
 
-// getEnv returns an environment variable's value from its key with a fallback
 func getEnv(key, fallback string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -65,7 +66,6 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-// mustGetEnv returns an environment variable's value from its key and panics if the key is not set
 func mustGetEnv(key string) string {
 	if value := os.Getenv(key); value != "" {
 		return value

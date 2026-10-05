@@ -10,17 +10,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// This file implements the position handler: creating, reading, listing,
-// renaming, and deleting a business's positions (job roles).
-
 type PositionHandler struct {
 	positionService *service.PositionService
 	authService     *service.AuthService
 	jwtSecret       string
 }
 
-// NewPositionHandler constructs a PositionHandler backed by positionService
-// and authService.
 func NewPositionHandler(
 	positionService *service.PositionService,
 	authService *service.AuthService,
@@ -33,8 +28,6 @@ func NewPositionHandler(
 	}
 }
 
-// Request Body Structures
-
 type createPositionRequest struct {
 	Name string `json:"name"`
 }
@@ -43,8 +36,6 @@ type renamePositionRequest struct {
 	Name string `json:"name"`
 }
 
-// Response Structures
-
 type SinglePositionResponse struct {
 	Position domain.Position `json:"position"`
 }
@@ -52,8 +43,6 @@ type SinglePositionResponse struct {
 type MultiplePositionResponse struct {
 	Positions []domain.Position `json:"positions"`
 }
-
-// Handlers
 
 // CreatePosition creates a new position under the business identified by businessId.
 //

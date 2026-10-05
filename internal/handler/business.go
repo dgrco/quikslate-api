@@ -12,18 +12,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// This file implements the business handler: creating a business, reading
-// and renaming it, deleting it, and managing membership (listing members,
-// removing them, granting or revoking admin status).
-
 type BusinessHandler struct {
 	businessService *service.BusinessService
 	authService     *service.AuthService
 	jwtSecret       string
 }
 
-// NewBusinessHandler constructs a BusinessHandler backed by businessService
-// and authService.
 func NewBusinessHandler(
 	businessService *service.BusinessService,
 	authService *service.AuthService,
@@ -36,8 +30,6 @@ func NewBusinessHandler(
 	}
 }
 
-// Request Body Structures
-
 type createBusinessRequest struct {
 	BusinessName string `json:"business_name"`
 }
@@ -49,8 +41,6 @@ type renameBusinessRequest struct {
 type setAdminRequest struct {
 	Admin bool `json:"admin"`
 }
-
-// Response Structures
 
 type CreateBusinessResponse struct {
 	BusinessId string `json:"business_id"`
@@ -93,8 +83,6 @@ type MyBusinessMembershipResponse struct {
 	IsPrimaryAdmin bool                `json:"is_primary_admin"`
 	LocationRoles  []MyLocationRoleDTO `json:"location_roles"`
 }
-
-// Handlers
 
 // CreateBusiness creates a new business owned by the caller, who becomes its primary admin.
 //
@@ -272,7 +260,6 @@ func (h *BusinessHandler) GetMyBusinessMembership(w http.ResponseWriter, r *http
 //	@Failure		403			{object}	response.errorResponse
 //	@Router			/businesses/{businessId} [patch]
 func (h *BusinessHandler) RenameBusiness(w http.ResponseWriter, r *http.Request) {
-	// prevent DoS risk
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
 	var req renameBusinessRequest
@@ -372,13 +359,11 @@ func (h *BusinessHandler) SetAdminForBusinessMember(w http.ResponseWriter, r *ht
 
 func (h *BusinessHandler) SetupRoutes(r chi.Router) {
 	r.Route("/businesses", func(r chi.Router) {
-		// Identity-only
 		r.Group(func(r chi.Router) {
 			r.Use(RequireIdentity(h.authService, h.jwtSecret))
 			r.Post("/", h.CreateBusiness)
 			r.Get("/me", h.GetBusinessesByUser)
 		})
-		// Business-scoped
 		r.Route("/{businessId}", func(r chi.Router) {
 			r.Use(RequireBusinessMember(h.authService, h.jwtSecret))
 			r.Get("/", h.GetBusiness)

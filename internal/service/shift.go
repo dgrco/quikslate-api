@@ -13,12 +13,10 @@ import (
 // cancelling shifts at a location. Every method here is location-scoped, so
 // it requires a session under RequireLocationMember (internal/handler/
 // middleware.go), unlike most other services which are business-scoped.
-
 type ShiftService struct {
 	repo domain.Repo
 }
 
-// NewShiftService constructs a ShiftService backed by repo.
 func NewShiftService(repo domain.Repo) *ShiftService {
 	return &ShiftService{
 		repo,
@@ -60,7 +58,6 @@ func (ss *ShiftService) CreateShift(
 		return domain.Shift{}, fmt.Errorf("failed to create shift: %w", err)
 	}
 
-	// Validate the position belongs to the user's business
 	if _, err := getAndValidatePosition(ctx, ss.repo, positionId); err != nil {
 		return domain.Shift{}, fmt.Errorf("failed to create shift: %w", err)
 	}
@@ -74,13 +71,10 @@ func (ss *ShiftService) CreateShift(
 	}
 
 	if userId != nil {
-		// check if userId belongs to businessId
 		bm, err := ss.repo.GetBusinessMember(ctx, *userId, ctxkeys.GetBusinessId(ctx))
 		if err != nil {
 			return domain.Shift{}, fmt.Errorf("failed to create shift: %w", err)
 		}
-		// check the caller is permitted to assign a shift to the target userId,
-		// and that the target can actually see the schedule here
 		if err := checkCanAssignToUser(ctx, ss.repo, &bm, ctxkeys.GetLocationId(ctx)); err != nil {
 			return domain.Shift{}, fmt.Errorf("failed to create shift: %w", err)
 		}
@@ -168,7 +162,6 @@ func (ss *ShiftService) UpdateShift(
 		return fmt.Errorf("failed to update shift: %w", err)
 	}
 
-	// Hierarchical check
 	if s.UserId != nil {
 		if err := checkCanActOnLocationRole(ctx, ss.repo, *s.UserId, s.LocationId, ctxkeys.GetBusinessId(ctx)); err != nil {
 			return fmt.Errorf("failed to update shift: %w", err)
@@ -189,13 +182,11 @@ func (ss *ShiftService) UpdateShift(
 		}
 	}
 
-	// If both times are set, make sure start-time is before end-time
 	if shiftUpdate.StartTime != nil && shiftUpdate.EndTime != nil {
 		if err := domain.ValidateShiftTimes(*shiftUpdate.StartTime, *shiftUpdate.EndTime); err != nil {
 			return fmt.Errorf("failed to update shift: %w", domain.ErrInvalidShiftTimes)
 		}
 	}
-	// if only one is set, make sure it is still valid relative to the other existing time
 	if shiftUpdate.StartTime == nil && shiftUpdate.EndTime != nil {
 		if !s.StartTime.Before(*shiftUpdate.EndTime) {
 			return fmt.Errorf("failed to update shift: %w", domain.ErrInvalidShiftTimes)
@@ -246,14 +237,11 @@ func (ss *ShiftService) AssignShift(
 	if err != nil {
 		return fmt.Errorf("failed to assign shift: %w", err)
 	}
-	// check if userId belongs to businessId
 	bm, err := ss.repo.GetBusinessMember(ctx, userId, ctxkeys.GetBusinessId(ctx))
 	if err != nil {
 		return fmt.Errorf("failed to assign shift: %w", err)
 	}
 
-	// check the caller is permitted to assign a shift to the target userId,
-	// and that the target can actually see the schedule here
 	if err := checkCanAssignToUser(ctx, ss.repo, &bm, ctxkeys.GetLocationId(ctx)); err != nil {
 		return fmt.Errorf("failed to assign shift: %w", err)
 	}
@@ -287,7 +275,7 @@ func (ss *ShiftService) UnassignShift(
 		return fmt.Errorf("failed to unassign shift: %w", err)
 	}
 	if s.UserId == nil {
-		return domain.ErrNotFound // nothing to unassign
+		return domain.ErrNotFound
 	}
 
 	_, err = requireLocationRole(ctx, domain.Manager, domain.LocationLead)
@@ -321,7 +309,6 @@ func (ss *ShiftService) CancelShift(
 		return fmt.Errorf("failed to cancel shift: %w", err)
 	}
 
-	// Hierarchical check
 	if s.UserId != nil {
 		if err := checkCanActOnLocationRole(ctx, ss.repo, *s.UserId, s.LocationId, ctxkeys.GetBusinessId(ctx)); err != nil {
 			return fmt.Errorf("failed to cancel shift: %w", err)
@@ -344,7 +331,8 @@ func (ss *ShiftService) DeleteShift(
 	if _, err := getAndValidateShift(ctx, ss.repo, shiftId); err != nil {
 		return fmt.Errorf("failed to delete shift: %w", err)
 	}
-	if _, err := requireLocationRole(ctx); err != nil { // no roles → admin only
+	// No roles listed, so only the admin bypass inside requireLocationRole passes.
+	if _, err := requireLocationRole(ctx); err != nil {
 		return fmt.Errorf("failed to delete shift: %w", err)
 	}
 	if err := ss.repo.DeleteShift(ctx, shiftId); err != nil {

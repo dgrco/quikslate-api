@@ -12,12 +12,10 @@ import (
 // business, renaming or deleting it, and managing membership (admin status,
 // removal). Most methods expect businessId, and often userId, to already be
 // resolved into ctx by internal/handler's auth middleware.
-
 type BusinessService struct {
 	repo domain.Repo
 }
 
-// NewBusinessService constructs a BusinessService backed by repo.
 func NewBusinessService(repo domain.Repo) *BusinessService {
 	return &BusinessService{
 		repo,
@@ -181,12 +179,10 @@ func (s *BusinessService) RemoveUserFromBusiness(ctx context.Context, userId str
 		return fmt.Errorf("failed to remove user from business: %w", err)
 	}
 
-	// Check if the caller can remove the target
 	if !canActOnBusinessMember(ctx, &bm) {
 		return domain.ErrForbidden
 	}
 
-	// Last admin removal check
 	if bm.IsAdmin {
 		nAdmins, err := txRepo.GetAdminCount(ctx, businessId)
 		if err != nil {
@@ -197,17 +193,14 @@ func (s *BusinessService) RemoveUserFromBusiness(ctx context.Context, userId str
 		}
 	}
 
-	// Remove the user from business_members
 	if err := txRepo.RemoveUserFromBusiness(ctx, userId, businessId); err != nil {
 		return fmt.Errorf("failed to remove user from business: %w", err)
 	}
 
-	// Remove every location role the user has at the business
 	if err := txRepo.RemoveAllRolesOfUserFromBusiness(ctx, userId, businessId); err != nil {
 		return fmt.Errorf("failed to remove user from business: %w", err)
 	}
 
-	// Remove all employee_positions entries associated with the user and the business
 	if err := txRepo.RemoveAllPositionsForUserInBusiness(ctx, userId, businessId); err != nil {
 		return fmt.Errorf("failed to remove user from business: %w", err)
 	}
@@ -238,12 +231,10 @@ func (s *BusinessService) SetAdminForBusinessMember(ctx context.Context, userId 
 		return fmt.Errorf("failed to set admin: %w", err)
 	}
 
-	// Check if the caller can modify the target
 	if !canActOnBusinessMember(ctx, &bm) {
 		return domain.ErrForbidden
 	}
 
-	// Last admin removal check
 	if bm.IsAdmin && admin == false {
 		nAdmins, err := txRepo.GetAdminCount(ctx, businessId)
 		if err != nil {

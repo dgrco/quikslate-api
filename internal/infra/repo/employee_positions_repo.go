@@ -8,10 +8,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// employee_positions_repo.go implements domain.EmployeePositionRepository:
-// managing which positions a user is qualified to work, via the
-// employee_positions join table.
-
 const (
 	addPositionQuery = `
 		INSERT INTO employee_positions (user_id, position_id)
@@ -38,13 +34,10 @@ const (
 	`
 )
 
-// scanEmployeePositionFields scans a row's employee_positions columns into ep
-// using scan (either row.Scan or rows.Scan).
 func scanEmployeePositionFields(ep *domain.EmployeePosition, scan func(...any) error) error {
 	return scan(&ep.UserId, &ep.PositionId)
 }
 
-// scanEmployeePosition scans a single row into a domain.EmployeePosition.
 func scanEmployeePosition(row pgx.Row) (domain.EmployeePosition, error) {
 	var ep domain.EmployeePosition
 	err := scanEmployeePositionFields(&ep, row.Scan)
@@ -54,8 +47,6 @@ func scanEmployeePosition(row pgx.Row) (domain.EmployeePosition, error) {
 	return ep, nil
 }
 
-// scanEmployeePositions scans every remaining row into a slice of
-// domain.EmployeePosition.
 func scanEmployeePositions(rows pgx.Rows) ([]domain.EmployeePosition, error) {
 	employeePositions := []domain.EmployeePosition{}
 	for rows.Next() {

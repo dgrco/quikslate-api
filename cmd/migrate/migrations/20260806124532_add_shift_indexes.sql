@@ -1,7 +1,7 @@
 -- +goose Up
 -- The schedule UI fetches one week at a time via
 -- GetShiftDetailsByLocationId, which filters on location_id plus a
--- start_time/end_time range — without this the query is a seq scan over every
+-- start_time/end_time range, without this the query is a seq scan over every
 -- shift the location has ever had.
 CREATE INDEX shifts_location_start_idx ON shifts (location_id, start_time);
 

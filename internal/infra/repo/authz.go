@@ -9,12 +9,9 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// authz.go implements domain.AuthzContextRepository: looking up a caller's
-// admin flags for a business and, for location-scoped calls, their role at a
-// location, so the service layer can authorize requests without embedding
-// that data in the JWT. Resolving it per request is what makes a revoked
-// role or removed membership take effect immediately, rather than lingering
-// until the caller's access token expires.
+// Resolved per request rather than embedded in the JWT, so a revoked role or
+// removed membership takes effect immediately instead of lingering until the
+// caller's access token expires.
 
 const (
 	getBusinessMemberAuthzQuery = `
@@ -28,7 +25,6 @@ const (
 	// resolve to role = '' instead of failing, which is only safe for
 	// non-admins (rejected downstream by a role check) and not for admins
 	// (who bypass role checks entirely).
-	// We need to ensure NULL isn't returned, so we coalesce role.
 	getLocationMemberAuthzQuery = `
 		SELECT bm.is_admin, bm.is_primary_admin, COALESCE(lr.role::text, '') AS role
 		FROM business_members bm
@@ -40,8 +36,6 @@ const (
 	`
 )
 
-// scanBusinessMemberAuthzContextFields scans a row's business-member-authz
-// columns into ac using scan (either row.Scan or rows.Scan).
 func scanBusinessMemberAuthzContextFields(ac *domain.BusinessMemberAuthzContext, scan func(...any) error) error {
 	if err := scan(&ac.IsPrimaryAdmin, &ac.IsAdmin); err != nil {
 		return err
@@ -49,8 +43,6 @@ func scanBusinessMemberAuthzContextFields(ac *domain.BusinessMemberAuthzContext,
 	return nil
 }
 
-// scanLocationMemberAuthzContextFields scans a row's location-member-authz
-// columns (admin flags plus role) into ac using scan.
 func scanLocationMemberAuthzContextFields(ac *domain.LocationMemberAuthzContext, scan func(...any) error) error {
 	if err := scan(&ac.IsPrimaryAdmin, &ac.IsAdmin, &ac.Role); err != nil {
 		return err
@@ -58,8 +50,6 @@ func scanLocationMemberAuthzContextFields(ac *domain.LocationMemberAuthzContext,
 	return nil
 }
 
-// scanBusinessMemberAuthzContext scans a single row into a
-// domain.BusinessMemberAuthzContext.
 func scanBusinessMemberAuthzContext(row pgx.Row) (domain.BusinessMemberAuthzContext, error) {
 	var ac domain.BusinessMemberAuthzContext
 	if err := scanBusinessMemberAuthzContextFields(&ac, row.Scan); err != nil {
@@ -68,8 +58,6 @@ func scanBusinessMemberAuthzContext(row pgx.Row) (domain.BusinessMemberAuthzCont
 	return ac, nil
 }
 
-// scanLocationMemberAuthzContext scans a single row into a
-// domain.LocationMemberAuthzContext.
 func scanLocationMemberAuthzContext(row pgx.Row) (domain.LocationMemberAuthzContext, error) {
 	var ac domain.LocationMemberAuthzContext
 	if err := scanLocationMemberAuthzContextFields(&ac, row.Scan); err != nil {

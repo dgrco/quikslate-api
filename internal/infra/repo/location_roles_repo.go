@@ -9,10 +9,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// location_roles_repo.go implements domain.LocationRoleRepository: managing
-// the per-location role (LocationLead, Manager, Employee) a business member
-// holds at a specific location.
-
 const (
 	assignRoleQuery = `
 		INSERT INTO location_roles (user_id, business_id, location_id, role)
@@ -46,8 +42,6 @@ const (
 	`
 )
 
-// scanLocationRoleFields scans a row's location_roles columns into lr using
-// scan (either row.Scan or rows.Scan).
 func scanLocationRoleFields(lr *domain.LocationRole, scan func(...any) error) error {
 	return scan(
 		&lr.UserId,
@@ -59,7 +53,6 @@ func scanLocationRoleFields(lr *domain.LocationRole, scan func(...any) error) er
 	)
 }
 
-// scanLocationRole scans a single row into a domain.LocationRole.
 func scanLocationRole(row pgx.Row) (domain.LocationRole, error) {
 	var lr domain.LocationRole
 	if err := scanLocationRoleFields(&lr, row.Scan); err != nil {
@@ -68,8 +61,6 @@ func scanLocationRole(row pgx.Row) (domain.LocationRole, error) {
 	return lr, nil
 }
 
-// scanLocationRoles scans every remaining row into a slice of
-// domain.LocationRole.
 func scanLocationRoles(rows pgx.Rows) ([]domain.LocationRole, error) {
 	lrs := []domain.LocationRole{}
 	for rows.Next() {
@@ -85,8 +76,6 @@ func scanLocationRoles(rows pgx.Rows) ([]domain.LocationRole, error) {
 	return lrs, nil
 }
 
-// scanLocationRoleDetailFields scans a row's location-role-plus-user columns
-// (the join with users) into lrd using scan.
 func scanLocationRoleDetailFields(lrd *domain.LocationRoleDetail, scan func(...any) error) error {
 	return scan(
 		&lrd.UserId,
@@ -100,8 +89,6 @@ func scanLocationRoleDetailFields(lrd *domain.LocationRoleDetail, scan func(...a
 	)
 }
 
-// scanLocationRoleDetails scans every remaining row into a slice of
-// domain.LocationRoleDetail.
 func scanLocationRoleDetails(rows pgx.Rows) ([]domain.LocationRoleDetail, error) {
 	lrds := []domain.LocationRoleDetail{}
 	for rows.Next() {

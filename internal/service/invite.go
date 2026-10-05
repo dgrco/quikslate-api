@@ -16,12 +16,10 @@ import (
 // account first. Invites are single-use, expire after 7 days, and are
 // identified to the invitee by an opaque token (never the DB id), hashed
 // the same way refresh tokens are, see AuthService.
-
 type InviteService struct {
 	repo domain.Repo
 }
 
-// NewInviteService constructs an InviteService backed by repo.
 func NewInviteService(repo domain.Repo) *InviteService {
 	return &InviteService{
 		repo,
@@ -57,33 +55,25 @@ func (s *InviteService) CreateInvite(
 		return InviteResult{}, domain.ErrForbidden
 	}
 
-	// Enforce caller -> target role hierarchy
 	if !canActOnRole(callerRole, targetRole) {
 		return InviteResult{}, domain.ErrForbidden
 	}
 
-	// Precondition check: user must not already have a pending invite
 	_, err := s.repo.GetPendingInviteByEmailAndBusinessId(ctx, email, businessId)
 	if err == nil {
-		// pending invite already exists
 		return InviteResult{}, fmt.Errorf("failed to create invite: %w", domain.ErrAlreadyExists)
 	}
 	if !errors.Is(err, domain.ErrNotFound) {
-		// If there is an error and it's unrelated to ErrNotFound, return it
 		return InviteResult{}, fmt.Errorf("failed to create invite: %w", err)
 	}
 
-	// Precondition check: user must not already be a member of the business
 	u, err := s.repo.GetUserByEmail(ctx, email)
 	if err == nil {
-		// Member with this email already exists, verify it's not a member of the business
 		if _, err := s.repo.GetBusinessMember(ctx, u.Id, businessId); err == nil {
-			// User already exists!
 			return InviteResult{}, fmt.Errorf("failed to create invite: %w", domain.ErrAlreadyExists)
 		}
 	}
 	if err != nil && !errors.Is(err, domain.ErrNotFound) {
-		// If there is an error and it's unrelated to ErrNotFound, return it
 		return InviteResult{}, fmt.Errorf("failed to create invite: %w", err)
 	}
 
@@ -93,7 +83,6 @@ func (s *InviteService) CreateInvite(
 	}
 	tokenHash := hashToken(token)
 
-	// Validation -- @TODO: perhaps move this up for better optimization
 	email = domain.NormalizeEmail(email)
 	if err := domain.ValidateEmail(email); err != nil {
 		return InviteResult{}, fmt.Errorf("failed to create invite: %w", err)
@@ -102,8 +91,7 @@ func (s *InviteService) CreateInvite(
 		return InviteResult{}, fmt.Errorf("failed to create invite: %w", err)
 	}
 
-	// Call repo function
-	expiresAt := time.Now().Add(7 * 24 * time.Hour) // 7 days
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
 	_, err = s.repo.CreateInvite(ctx, tokenHash, email, businessId, locationId, targetRole, expiresAt)
 	if err != nil {
 		return InviteResult{}, fmt.Errorf("failed to create invite: %w", err)
@@ -125,7 +113,6 @@ func (s *InviteService) PreviewInviteByToken(ctx context.Context, token string) 
 		return InviteDTO{}, domain.ErrNotFound
 	}
 
-	// Get business to extract businessName
 	b, err := s.repo.GetBusinessById(ctx, inv.BusinessId)
 	if err != nil {
 		return InviteDTO{}, fmt.Errorf("failed to get invite by token: %w", err)
@@ -186,7 +173,6 @@ func (s *InviteService) RevokeInvite(ctx context.Context, locationId, inviteId s
 func (s *InviteService) AcceptInvite(ctx context.Context, token string) (string, error) {
 	userId := ctxkeys.GetUserId(ctx)
 
-	// Token validation
 	inv, err := s.repo.GetInviteByTokenHash(ctx, hashToken(token))
 	if err != nil {
 		return "", domain.ErrNotFound
@@ -195,7 +181,6 @@ func (s *InviteService) AcceptInvite(ctx context.Context, token string) (string,
 		return "", domain.ErrNotFound
 	}
 
-	// Confirm user email and invite email matches
 	caller, err := s.repo.GetUserById(ctx, userId)
 	if err != nil {
 		return "", err
@@ -212,8 +197,6 @@ func (s *InviteService) AcceptInvite(ctx context.Context, token string) (string,
 
 	txRepo := s.repo.WithTx(tx)
 
-	// Set-up the user in the business/location
-	// and mark the invite as accepted.
 	if err := txRepo.AddUserToBusiness(ctx, userId, inv.BusinessId, false, false); err != nil {
 		return "", err
 	}

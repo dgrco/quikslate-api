@@ -10,10 +10,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// business_members_repo.go implements domain.BusinessMemberRepository:
-// managing the business_members join table that links users to the
-// businesses they belong to, along with their admin/primary-admin flags.
-
 const (
 	addUserToBusinessQuery = `
 		INSERT INTO business_members (user_id, business_id, is_primary_admin, is_admin)
@@ -49,8 +45,6 @@ const (
 	`
 )
 
-// scanBusinessMemberFields scans a row's business_members columns into bm
-// using scan (either row.Scan or rows.Scan).
 func scanBusinessMemberFields(bm *domain.BusinessMember, scan func(...any) error) error {
 	return scan(
 		&bm.UserId,
@@ -62,8 +56,6 @@ func scanBusinessMemberFields(bm *domain.BusinessMember, scan func(...any) error
 	)
 }
 
-// scanBusinessMemberDetailFields scans a row's business-member-plus-user
-// columns (the join with users) into bmd using scan.
 func scanBusinessMemberDetailFields(bmd *domain.BusinessMemberDetail, scan func(...any) error) error {
 	return scan(
 		&bmd.UserId,
@@ -77,7 +69,6 @@ func scanBusinessMemberDetailFields(bmd *domain.BusinessMemberDetail, scan func(
 	)
 }
 
-// scanBusinessMember scans a single row into a domain.BusinessMember.
 func scanBusinessMember(row pgx.Row) (domain.BusinessMember, error) {
 	var bm domain.BusinessMember
 	if err := scanBusinessMemberFields(&bm, row.Scan); err != nil {
@@ -86,8 +77,6 @@ func scanBusinessMember(row pgx.Row) (domain.BusinessMember, error) {
 	return bm, nil
 }
 
-// scanBusinessMemberDetails scans every remaining row into a slice of
-// domain.BusinessMemberDetail.
 func scanBusinessMemberDetails(rows pgx.Rows) ([]domain.BusinessMemberDetail, error) {
 	bmds := []domain.BusinessMemberDetail{}
 	for rows.Next() {
@@ -115,7 +104,6 @@ func (r *PgRepository) AddUserToBusiness(
 	isAdmin bool,
 ) error {
 	if _, err := r.exec.Exec(ctx, addUserToBusinessQuery, userId, businessId, isPrimaryAdmin, isAdmin); err != nil {
-		// Check if there is a duplicate
 		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == ErrPgUniqueConstraintViolation {
 			return domain.ErrAlreadyExists
 		}

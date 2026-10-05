@@ -8,9 +8,7 @@ import (
 )
 
 // Business is the top-level tenant: every location, position, and shift
-// belongs to one. This file covers the Business entity itself; membership is
-// in business_member.go.
-
+// belongs to one.
 type Business struct {
 	Id        string    `json:"id"`
 	Name      string    `json:"name"`
@@ -18,7 +16,6 @@ type Business struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// ValidateBusinessName returns an error if the businessName is empty or if its too long
 func ValidateBusinessName(businessName string) error {
 	if strings.TrimSpace(businessName) == "" {
 		return NewValidationError("business name cannot be empty")

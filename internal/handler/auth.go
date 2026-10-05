@@ -15,27 +15,19 @@ import (
 	"github.com/go-chi/httprate"
 )
 
-// This file implements the auth handler: registration, login, refresh-token
-// rotation, and logout, plus the HttpOnly refresh_token cookie helper shared
-// by all four.
-
 type AuthHandler struct {
 	authService *service.AuthService
-	secure      bool // should be true in production and false in development (set in Config.SecureMode)
 	jwtSecret   string
+	secure      bool
 }
 
-// NewAuthHandler creates an AuthHandler object.
-// The secure parameter refers to whether we are in a prod or dev environment.
-func NewAuthHandler(authService *service.AuthService, secure bool, jwtSecret string) *AuthHandler {
+func NewAuthHandler(authService *service.AuthService, jwtSecret string, secure bool) *AuthHandler {
 	return &AuthHandler{
 		authService,
-		secure,
 		jwtSecret,
+		secure,
 	}
 }
-
-// Request Body Structures
 
 type registerRequest struct {
 	Email    string `json:"email"`
@@ -48,19 +40,27 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
-// Response Structures
+type changePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
+type forgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
+type resetPasswordRequest struct {
+	Token       string `json:"token"`
+	NewPassword string `json:"new_password"`
+}
 
 type TokenResponse struct {
 	AccessToken string `json:"access_token"`
 }
 
-// Helpers
-
 func isEmpty(str string) bool {
 	return strings.TrimSpace(str) == ""
 }
-
-// Handlers
 
 // Register creates a new user account.
 //
@@ -83,7 +83,6 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// validate request
 	if isEmpty(req.Email) || isEmpty(req.Name) || isEmpty(req.Password) {
 		response.WriteError(w, "email, name, and password are required", http.StatusBadRequest)
 		return
@@ -119,7 +118,6 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// validate request
 	if isEmpty(req.Email) || isEmpty(req.Password) {
 		response.WriteError(w, "email and password are required", http.StatusBadRequest)
 		return
@@ -165,6 +163,18 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, TokenResponse{AccessToken: authResult.AccessToken}, http.StatusOK)
 }
 
+func ClearCookie(w http.ResponseWriter, secure bool) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		Path:     "/v1/auth",
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1,
+	})
+}
+
 // Logout revokes the current refresh token and clears its cookie.
 //
 //	@Summary		Logout
@@ -176,35 +186,95 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
 
-	clearCookie := func() {
-		http.SetCookie(w, &http.Cookie{
-			Name:     "refresh_token",
-			Value:    "",
-			Path:     "/v1/auth",
-			HttpOnly: true,
-			Secure:   h.secure,
-			SameSite: http.SameSiteLaxMode,
-			MaxAge:   -1, // set the cookie as expired
-		})
-	}
-
 	cookie, err := r.Cookie("refresh_token")
 	if err != nil {
-		clearCookie() // harmless if already absent, ensures consistent response
+		ClearCookie(w, h.secure)
 		response.WriteJSON(w, SimpleResponse{Message: "ok"}, http.StatusOK)
 		return
 	}
 	refreshToken := cookie.Value
 
+	// ErrNotFound means the token was already revoked or expired, which is
+	// the state logout wants to reach, so it is success, not an error.
 	err = h.authService.Logout(r.Context(), refreshToken)
 	if err != nil && !errors.Is(err, domain.ErrNotFound) {
-		// again, on ErrNotFound we skip error handling since we want a consistent response
 		log.Printf("logout: %v", err)
 		response.WriteError(w, ERR_INTERNAL_SERVER, http.StatusInternalServerError)
 		return
 	}
 
-	clearCookie()
+	ClearCookie(w, h.secure)
+	response.WriteJSON(w, SimpleResponse{Message: "ok"}, http.StatusOK)
+}
+
+// ForgotPassword issues a password reset token for an email address.
+//
+//	@Summary		Forgot Password
+//	@Description	Request a password reset link. Always returns 202 whether or not the address has an account, so the response cannot be used to discover which emails are registered.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		forgotPasswordRequest	true	"Email to send the reset link to"
+//	@Success		202		{object}	SimpleResponse
+//	@Failure		400		{object}	response.errorResponse	"invalid body or missing email"
+//	@Router			/auth/forgot-password [post]
+func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
+
+	var req forgotPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(w, ERR_INVALID_REQ_BODY, http.StatusBadRequest)
+		return
+	}
+
+	if isEmpty(req.Email) {
+		response.WriteError(w, "email is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.authService.SendPasswordResetToken(r.Context(), req.Email); err != nil {
+		handleServiceError(w, err, "forgot password")
+		return
+	}
+
+	response.WriteJSON(w, SimpleResponse{Message: "if that email has an account, a reset link has been sent"}, http.StatusAccepted)
+}
+
+// ResetPassword consumes a password reset token and sets a new password.
+//
+//	@Summary		Reset Password
+//	@Description	Consume a password reset token, set a new password, revoke every refresh token for the user, and clear the refresh_token cookie. The token is single-use.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		resetPasswordRequest	true	"Reset token and new password"
+//	@Success		200		{object}	SimpleResponse
+//	@Failure		400		{object}	response.errorResponse	"invalid body, missing fields, unusable token, or password rejected"
+//	@Router			/auth/reset-password [post]
+func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, DEFAULT_MAX_REQUEST_BODY_SIZE)
+
+	var req resetPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(w, ERR_INVALID_REQ_BODY, http.StatusBadRequest)
+		return
+	}
+
+	if isEmpty(req.Token) || isEmpty(req.NewPassword) {
+		response.WriteError(w, "token and new_password are required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.authService.UsePasswordResetToken(r.Context(), req.NewPassword, req.Token); err != nil {
+		handleServiceError(w, err, "reset password")
+		return
+	}
+
+	// The service revoked every refresh token for the user, so whatever this
+	// browser is still holding is dead. Clear it rather than leaving a cookie
+	// that only fails on the next refresh.
+	ClearCookie(w, h.secure)
+
 	response.WriteJSON(w, SimpleResponse{Message: "ok"}, http.StatusOK)
 }
 
@@ -220,19 +290,26 @@ func setRefreshTokenCookie(w http.ResponseWriter, token string, secure bool) {
 		// the cookie rides along only on the two endpoints that consume it,
 		// refresh and logout, rather than on every API call.
 		Path:     "/v1/auth",
-		MaxAge:   30 * 24 * 60 * 60, // 30 days
+		MaxAge:   30 * 24 * 60 * 60,
 		HttpOnly: true,
 	})
 }
 
-// SetupRoutes registers the auth route group and its subroutes
 func (h *AuthHandler) SetupRoutes(r chi.Router) {
 	r.Route("/auth", func(r chi.Router) {
-		// rate-limit by IP (may add per-email rate-limiting via redis in the future)
 		r.Group(func(r chi.Router) {
-			r.Use(httprate.LimitByIP(10, 1*time.Minute))
+			r.Use(httprate.LimitByRealIP(60, 1*time.Minute))
 			r.Post("/register", h.Register)
 			r.Post("/login", h.Login)
+		})
+
+		// Tighter limit than register/login: these two are the enumeration and
+		// password-guessing surface (a held reset token can otherwise probe the
+		// current password indefinitely via the same-password rejection).
+		r.Group(func(r chi.Router) {
+			r.Use(httprate.LimitByRealIP(10, 1*time.Minute))
+			r.Post("/forgot-password", h.ForgotPassword)
+			r.Post("/reset-password", h.ResetPassword)
 		})
 
 		r.Post("/refresh", h.Refresh)

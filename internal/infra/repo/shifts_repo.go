@@ -10,10 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// shifts_repo.go implements domain.ShiftRepository: CRUD and status
-// transitions (assign, unassign, cancel) for shifts, plus the queries
-// backing schedule display and overlap checks.
-
 const (
 	createShiftQuery = `
 		INSERT INTO shifts (user_id, location_id, position_id, status, start_time, end_time)
@@ -74,8 +70,6 @@ const (
 	`
 )
 
-// scanShiftFields scans a row's shifts columns into s using scan (either
-// row.Scan or rows.Scan).
 func scanShiftFields(s *domain.Shift, scan func(...any) error) error {
 	return scan(
 		&s.Id,
@@ -90,7 +84,6 @@ func scanShiftFields(s *domain.Shift, scan func(...any) error) error {
 	)
 }
 
-// scanShift scans a single row into a domain.Shift.
 func scanShift(row pgx.Row) (domain.Shift, error) {
 	var s domain.Shift
 	err := scanShiftFields(&s, row.Scan)
@@ -100,7 +93,6 @@ func scanShift(row pgx.Row) (domain.Shift, error) {
 	return s, nil
 }
 
-// scanShifts scans every remaining row into a slice of domain.Shift.
 func scanShifts(rows pgx.Rows) ([]domain.Shift, error) {
 	shifts := []domain.Shift{}
 	for rows.Next() {
@@ -117,8 +109,7 @@ func scanShifts(rows pgx.Rows) ([]domain.Shift, error) {
 	return shifts, nil
 }
 
-// scanShiftDetails scans every remaining row into a slice of
-// domain.ShiftDetail. Column order must match getShiftDetailsByLocationIdQuery.
+// Column order must match getShiftDetailsByLocationIdQuery.
 func scanShiftDetails(rows pgx.Rows) ([]domain.ShiftDetail, error) {
 	details := []domain.ShiftDetail{}
 	for rows.Next() {
@@ -147,8 +138,6 @@ func scanShiftDetails(rows pgx.Rows) ([]domain.ShiftDetail, error) {
 	return details, nil
 }
 
-// CreateShift inserts a new shift at locationId for positionId, optionally
-// pre-assigned to userId, and returns it.
 func (r *PgRepository) CreateShift(
 	ctx context.Context,
 	userId *string,

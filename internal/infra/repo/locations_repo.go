@@ -9,10 +9,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// locations_repo.go implements domain.LocationRepository: CRUD for
-// locations, which belong to a business and in turn own positions, shifts,
-// and location roles.
-
 const (
 	createLocationQuery = `
 		INSERT INTO locations (business_id, name, address, timezone)
@@ -41,8 +37,6 @@ const (
 	`
 )
 
-// scanLocationFields scans a row's locations columns into l using scan
-// (either row.Scan or rows.Scan).
 func scanLocationFields(l *domain.Location, scan func(...any) error) error {
 	return scan(
 		&l.Id,
@@ -55,7 +49,6 @@ func scanLocationFields(l *domain.Location, scan func(...any) error) error {
 	)
 }
 
-// scanLocation scans a single row into a domain.Location.
 func scanLocation(row pgx.Row) (domain.Location, error) {
 	var l domain.Location
 	err := scanLocationFields(&l, row.Scan)
@@ -65,7 +58,6 @@ func scanLocation(row pgx.Row) (domain.Location, error) {
 	return l, nil
 }
 
-// scanLocations scans every remaining row into a slice of domain.Location.
 func scanLocations(rows pgx.Rows) ([]domain.Location, error) {
 	locations := []domain.Location{}
 	for rows.Next() {
@@ -82,7 +74,6 @@ func scanLocations(rows pgx.Rows) ([]domain.Location, error) {
 	return locations, nil
 }
 
-// CreateLocation inserts a new location under businessId and returns it.
 func (r *PgRepository) CreateLocation(ctx context.Context, businessId, name string, address *string, timezone string) (domain.Location, error) {
 	l, err := scanLocation(r.exec.QueryRow(ctx, createLocationQuery, businessId, name, address, timezone))
 	if err != nil {

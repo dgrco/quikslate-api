@@ -9,15 +9,16 @@ import (
 // auth. See internal/service/auth.go for hashing and rotation.
 
 type RefreshToken struct {
-	Id        string
-	UserId    string
-	Token     string
-	ExpiresAt time.Time
-	CreatedAt time.Time
+	Id        string    `json:"id"`
+	UserId    string    `json:"user_id"`
+	TokenHash string    `json:"token_hash"`
+	ExpiresAt time.Time `json:"expires_at"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type RefreshTokenRepository interface {
-	CreateRefreshToken(ctx context.Context, userId, token string, expiresAt time.Time) (RefreshToken, error)
-	GetRefreshToken(ctx context.Context, token string) (RefreshToken, error)
-	DeleteRefreshToken(ctx context.Context, id string) error
+	CreateRefreshToken(ctx context.Context, userId, tokenHash string, expiresAt time.Time) (RefreshToken, error)
+	GetRefreshToken(ctx context.Context, tokenHash string) (RefreshToken, error)
+	DeleteRefreshToken(ctx context.Context, tokenHash string) error
+	RevokeRefreshTokensByUserId(ctx context.Context, userId string) error
 }

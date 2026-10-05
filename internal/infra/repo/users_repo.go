@@ -10,9 +10,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// users_repo.go implements domain.UserRepository: CRUD for user accounts,
-// independent of any business membership.
-
 const (
 	createUserQuery = `
 		INSERT INTO users (email, name, password)
@@ -35,7 +32,6 @@ const (
 	`
 )
 
-// scanUser scans a single row into a domain.User.
 func scanUser(row pgx.Row) (domain.User, error) {
 	var u domain.User
 	err := row.Scan(
@@ -92,6 +88,37 @@ func (r *PgRepository) GetUserById(ctx context.Context, id string) (domain.User,
 	}
 
 	return u, nil
+}
+
+// UpdateUser performs a partial update based on domain.UserUpdate, returns an error if
+// either no row was found or some other db error occured. It performs a no-op if every
+// field in update is set to nil: this is not an error.
+func (r *PgRepository) UpdateUser(ctx context.Context, id string, update domain.UserUpdate) error {
+	builder := newUpdateBuilder()
+
+	if update.Name != nil {
+		builder.Add("name", *update.Name)
+	}
+	if update.Email != nil {
+		builder.Add("email", *update.Email)
+	}
+	if update.Password != nil {
+		builder.Add("password", *update.Password)
+	}
+	if builder.IsEmpty() {
+		return nil
+	}
+
+	query, args := builder.Build("users", "id", id)
+	cmdTag, err := r.exec.Exec(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to update user: %w", err)
+	}
+	if cmdTag.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+
+	return nil
 }
 
 // DeleteUser deletes a user by id. Unlike the other repos' delete methods,

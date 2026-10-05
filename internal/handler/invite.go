@@ -11,18 +11,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// This file implements the invite handler: creating, previewing, accepting,
-// listing, and revoking invites that let an email address join a business at
-// a given location and role.
-
 type InviteHandler struct {
 	inviteService *service.InviteService
 	authService   *service.AuthService
 	jwtSecret     string
 }
 
-// NewInviteHandler constructs an InviteHandler backed by inviteService and
-// authService.
 func NewInviteHandler(
 	inviteService *service.InviteService,
 	authService *service.AuthService,
@@ -35,14 +29,10 @@ func NewInviteHandler(
 	}
 }
 
-// Request Body Structures
-
 type createInviteRequest struct {
 	Email      string       `json:"email"`
 	TargetRole domain.LRole `json:"target_role"`
 }
-
-// Response Structures
 
 type CreateInviteResponse struct {
 	InviteToken string `json:"invite_token"`
@@ -64,8 +54,6 @@ type PendingInviteDTO struct {
 type MultiplePendingInviteResponse struct {
 	Invites []PendingInviteDTO `json:"invites"`
 }
-
-// Handlers
 
 // CreateInvite creates an outstanding invite for an email address to join the business at the location identified by locationId.
 //
@@ -213,7 +201,6 @@ func (h *InviteHandler) RevokeInvite(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, SimpleResponse{Message: "invite revoked"}, http.StatusOK)
 }
 
-// Routes
 func (h *InviteHandler) SetupRoutes(r chi.Router) {
 	r.Route("/businesses/{businessId}/invites", func(r chi.Router) {
 		r.Group(func(r chi.Router) {

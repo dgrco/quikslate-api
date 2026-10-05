@@ -332,6 +332,13 @@ definitions:
       user_id:
         type: string
     type: object
+  internal_handler.changePasswordRequest:
+    properties:
+      current_password:
+        type: string
+      new_password:
+        type: string
+    type: object
   internal_handler.createBusinessRequest:
     properties:
       business_name:
@@ -371,6 +378,11 @@ definitions:
       user_id:
         type: string
     type: object
+  internal_handler.forgotPasswordRequest:
+    properties:
+      email:
+        type: string
+    type: object
   internal_handler.loginRequest:
     properties:
       email:
@@ -395,6 +407,13 @@ definitions:
   internal_handler.renamePositionRequest:
     properties:
       name:
+        type: string
+    type: object
+  internal_handler.resetPasswordRequest:
+    properties:
+      new_password:
+        type: string
+      token:
         type: string
     type: object
   internal_handler.setAdminRequest:
@@ -428,6 +447,34 @@ info:
   title: QuikSlate API
   version: "1.0"
 paths:
+  /auth/forgot-password:
+    post:
+      consumes:
+      - application/json
+      description: Request a password reset link. Always returns 202 whether or not
+        the address has an account, so the response cannot be used to discover which
+        emails are registered.
+      parameters:
+      - description: Email to send the reset link to
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.forgotPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "400":
+          description: invalid body or missing email
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      summary: Forgot Password
+      tags:
+      - auth
   /auth/login:
     post:
       consumes:
@@ -523,6 +570,34 @@ paths:
           schema:
             $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
       summary: Register
+      tags:
+      - auth
+  /auth/reset-password:
+    post:
+      consumes:
+      - application/json
+      description: Consume a password reset token, set a new password, revoke every
+        refresh token for the user, and clear the refresh_token cookie. The token
+        is single-use.
+      parameters:
+      - description: Reset token and new password
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.resetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "400":
+          description: invalid body, missing fields, unusable token, or password rejected
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      summary: Reset Password
       tags:
       - auth
   /businesses:
@@ -2067,6 +2142,39 @@ paths:
       summary: Get Businesses By User
       tags:
       - businesses
+  /users/me/change-password:
+    post:
+      consumes:
+      - application/json
+      description: Revoke all refresh tokens, clear refresh_cookie, and changes the
+        user's password.
+      parameters:
+      - description: current and new password
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.changePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SimpleResponse'
+        "400":
+          description: invalid body or missing fields
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+        "401":
+          description: invalid credentials
+          schema:
+            $ref: '#/definitions/github_com_dgrco_quikslate_internal_response.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Change Password
+      tags:
+      - user
 securityDefinitions:
   BearerAuth:
     in: header

@@ -16,16 +16,16 @@ import (
 // AuthService implements registration, login, refresh-token rotation, and
 // logout, plus the authorization-context lookups the auth middleware calls
 // on every request.
-
 type AuthService struct {
 	repo      domain.Repo
+	mailer    domain.Mailer
 	jwtSecret string
 }
 
-// NewAuthService constructs an AuthService backed by repo, signing JWTs with jwtSecret.
-func NewAuthService(repo domain.Repo, jwtSecret string) *AuthService {
+func NewAuthService(repo domain.Repo, mailer domain.Mailer, jwtSecret string) *AuthService {
 	return &AuthService{
 		repo:      repo,
+		mailer:    mailer,
 		jwtSecret: jwtSecret,
 	}
 }
@@ -38,21 +38,17 @@ type AuthResult struct {
 // Register creates a new user with a hashed password and issues an initial
 // access/refresh token pair for them.
 func (s *AuthService) Register(ctx context.Context, email, name, password string) (*AuthResult, error) {
-	// Normalize email
 	email = domain.NormalizeEmail(email)
 
-	// validate email, name and password
 	if err := domain.ValidateUserRegistrationCredentials(email, name, password); err != nil {
 		return nil, err
 	}
 
-	// hash password
 	hashed, err := auth.HashPassword(password)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	// create user
 	user, err := s.repo.CreateUser(ctx, email, name, hashed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user with business: %w", err)
@@ -65,7 +61,6 @@ func (s *AuthService) Register(ctx context.Context, email, name, password string
 // access/refresh token pair. Returns domain.ErrInvalidCredentials for both an
 // unknown email and a wrong password, so callers can't distinguish the two.
 func (s *AuthService) Login(ctx context.Context, email, password string) (*AuthResult, error) {
-	// Normalize email
 	email = domain.NormalizeEmail(email)
 
 	user, err := s.repo.GetUserByEmail(ctx, email)
@@ -90,13 +85,11 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*AuthR
 func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthResult, error) {
 	hashedToken := hashToken(refreshToken)
 
-	// look up the refresh token in the database
 	stored, err := s.repo.GetRefreshToken(ctx, hashedToken)
 	if err != nil {
 		return nil, domain.ErrInvalidRefreshToken
 	}
 
-	// check it hasn't expired
 	if time.Now().After(stored.ExpiresAt) {
 		if err := s.repo.DeleteRefreshToken(ctx, hashedToken); err != nil {
 			return nil, fmt.Errorf("failed to rotate refresh token: %w", err)
@@ -104,7 +97,6 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthRe
 		return nil, domain.ErrInvalidRefreshToken
 	}
 
-	// Wrap in transaction:
 	tx, err := s.repo.BeginTransaction(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
@@ -113,7 +105,6 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthRe
 
 	txRepo := s.repo.WithTx(tx)
 
-	// rotate the token: delete old one, issue new one
 	if err := txRepo.DeleteRefreshToken(ctx, hashedToken); err != nil {
 		return nil, fmt.Errorf("failed to rotate refresh token: %w", err)
 	}
@@ -137,28 +128,144 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
 	return s.repo.DeleteRefreshToken(ctx, hashedToken)
 }
 
-// generateTokens creates a JWT and a refresh token for a given user
+// SendPasswordResetToken emails a single-use reset link to the account
+// registered under email, revoking any earlier link so a user has at most one
+// outstanding at a time.
+//
+// An email with no account returns nil, the same as success: reporting
+// ErrNotFound would let anyone probe which addresses have accounts. A non-nil
+// error means the user did not get a link, including when the mailer fails
+// after the token was stored, so callers should report it rather than claim
+// the email was sent.
+func (s *AuthService) SendPasswordResetToken(ctx context.Context, email string) error {
+	token, err := generateSecureToken(32)
+	if err != nil {
+		return fmt.Errorf("failed to reset password: %w", err)
+	}
+
+	tokenHash := hashToken(token)
+
+	// Registration lowercases before storing and GetUserByEmail matches
+	// exactly, so skipping this silently finds no account for any address the
+	// user capitalized -- and the no-account path is intentionally quiet.
+	email = domain.NormalizeEmail(email)
+
+	u, err := s.repo.GetUserByEmail(ctx, email)
+	if err != nil {
+		// Don't leak account existence: no account means no token to mail, but
+		// the caller still reports the same success it would for a real one.
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil
+		}
+		return fmt.Errorf("failed to reset password: %w", err)
+	}
+
+	tx, err := s.repo.BeginTransaction(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to reset password: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	txRepo := s.repo.WithTx(tx)
+
+	if err := txRepo.RevokePasswordResetTokensByUserId(ctx, u.Id); err != nil {
+		return fmt.Errorf("failed to reset password: %w", err)
+	}
+
+	if _, err = txRepo.CreatePasswordResetToken(ctx, u.Id, tokenHash, time.Now().Add(15*time.Minute)); err != nil {
+		return fmt.Errorf("failed to reset password: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to reset password: %w", err)
+	}
+
+	if err := s.mailer.SendForgotPassword(u.Email, token); err != nil {
+		return fmt.Errorf("failed to send password reset email: %w", err)
+	}
+
+	return nil
+}
+
+// UsePasswordResetToken changes the user's password and marks the token as being 'used'.
+// An already-used token cannot be used again (enforced by DB query).
+// If the newPassword is the same as the old (via DB lookup -> CheckPassword()) return an error.
+func (s *AuthService) UsePasswordResetToken(ctx context.Context, newPassword, token string) error {
+	if err := domain.ValidateUserPassword(newPassword); err != nil {
+		return err
+	}
+
+	tokenHash := hashToken(token)
+	passwordHash, err := auth.HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("failed to use password reset token: %w", err)
+	}
+
+	tx, err := s.repo.BeginTransaction(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to use password reset token: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	txRepo := s.repo.WithTx(tx)
+
+	tok, err := txRepo.GetPasswordResetToken(ctx, tokenHash)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return domain.ErrInvalidPasswordResetToken
+		}
+		return fmt.Errorf("failed to use password reset token: %w", err)
+	}
+
+	u, err := txRepo.GetUserById(ctx, tok.UserId)
+	if err != nil {
+		return fmt.Errorf("failed to use password reset token: %w", err)
+	}
+
+	if auth.CheckPassword(newPassword, u.Password) {
+		return domain.ErrSamePassword
+	}
+
+	// the conditional UPDATE (used_at IS NULL AND expires_at > NOW()) is the
+	// atomic consume: a concurrent redemption blocks on the row lock, then
+	// re-evaluates the predicate and comes back with no rows affected.
+	if err := txRepo.UsePasswordResetToken(ctx, tokenHash); err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return domain.ErrInvalidPasswordResetToken
+		}
+		return fmt.Errorf("failed to use password reset token: %w", err)
+	}
+
+	if err := txRepo.UpdateUser(ctx, tok.UserId, domain.UserUpdate{Password: &passwordHash}); err != nil {
+		return fmt.Errorf("failed to use password reset token: %w", err)
+	}
+
+	if err := txRepo.RevokeRefreshTokensByUserId(ctx, u.Id); err != nil {
+		return fmt.Errorf("failed to use password reset token: %w", err)
+	}
+
+	return tx.Commit(ctx)
+}
+
+// generateTokens takes repo rather than using s.repo so Refresh can pass its
+// tx-scoped repo and have the new token commit or roll back with the rotation.
 func (s *AuthService) generateTokens(
 	ctx context.Context,
 	repo domain.Repo,
 	userId string,
 ) (*AuthResult, error) {
-	// generate JWT
 	accessToken, err := auth.GenerateAccessToken(userId, s.jwtSecret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	// generate a random refresh token
 	refreshToken, err := generateSecureToken(32)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate refresh token")
 	}
 
-	// hash the refresh token for storage
 	hashedToken := hashToken(refreshToken)
 
-	// store hashed refresh token in database
 	expiresAt := time.Now().Add(30 * 24 * time.Hour)
 	_, err = repo.CreateRefreshToken(ctx, userId, hashedToken, expiresAt)
 	if err != nil {
@@ -178,14 +285,13 @@ func generateSecureToken(n int) (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-// hashToken computes the SHA256 sum of a token and returns a hex-encoded string
-// of length 64.
+// hashToken uses unsalted SHA-256, not bcrypt: the input is 256 bits of
+// randomness, so there is nothing to brute-force, and lookups need a
+// deterministic hash to query by.
 func hashToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
 }
-
-// Authz
 
 // GetBusinessMemberAuthzContext fetches the caller's admin/primary-admin
 // status for businessId, fresh from the database. Called by

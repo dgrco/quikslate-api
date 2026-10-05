@@ -11,12 +11,10 @@ import (
 // PositionService manages the job roles (e.g. "cashier") a business offers,
 // used to categorize shifts and to record which positions an employee is
 // qualified to work.
-
 type PositionService struct {
 	repo domain.Repo
 }
 
-// NewPositionService constructs a PositionService backed by repo.
 func NewPositionService(repo domain.Repo) *PositionService {
 	return &PositionService{
 		repo,

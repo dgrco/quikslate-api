@@ -10,10 +10,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// positions_repo.go implements domain.PositionRepository: CRUD for
-// positions, the job roles (e.g. "cashier") that shifts and employee
-// qualifications reference.
-
 const (
 	createPositionQuery = `
 		INSERT INTO positions (business_id, name)
@@ -41,8 +37,6 @@ const (
 	`
 )
 
-// scanPositionFields scans a row's positions columns into p using scan
-// (either row.Scan or rows.Scan).
 func scanPositionFields(p *domain.Position, scan func(...any) error) error {
 	return scan(
 		&p.Id,
@@ -53,7 +47,6 @@ func scanPositionFields(p *domain.Position, scan func(...any) error) error {
 	)
 }
 
-// scanPosition scans a single row into a domain.Position.
 func scanPosition(row pgx.Row) (domain.Position, error) {
 	var p domain.Position
 	err := scanPositionFields(&p, row.Scan)
@@ -63,7 +56,6 @@ func scanPosition(row pgx.Row) (domain.Position, error) {
 	return p, nil
 }
 
-// scanPositions scans every remaining row into a slice of domain.Position.
 func scanPositions(rows pgx.Rows) ([]domain.Position, error) {
 	positions := []domain.Position{}
 	for rows.Next() {
@@ -111,7 +103,6 @@ func (r *PgRepository) GetPositionById(ctx context.Context, id string) (domain.P
 	return p, nil
 }
 
-// GetPositionsByBusinessId returns every position under businessId.
 func (r *PgRepository) GetPositionsByBusinessId(ctx context.Context, businessId string) ([]domain.Position, error) {
 	rows, err := r.exec.Query(ctx, getPositionsByBusinessIdQuery, businessId)
 	if err != nil {

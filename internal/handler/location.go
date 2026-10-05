@@ -10,17 +10,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// This file implements the location handler: creating, reading, listing,
-// updating, and deleting a business's locations.
-
 type LocationHandler struct {
 	locationService *service.LocationService
 	authService     *service.AuthService
 	jwtSecret       string
 }
 
-// NewLocationHandler constructs a LocationHandler backed by locationService
-// and authService.
 func NewLocationHandler(
 	locationService *service.LocationService,
 	authService *service.AuthService,
@@ -32,8 +27,6 @@ func NewLocationHandler(
 		jwtSecret,
 	}
 }
-
-// Request Structures
 
 // createLocationRequest's Timezone is an IANA name (e.g. "America/New_York").
 // It's required on both this and updateLocationRequest, not
@@ -52,8 +45,6 @@ type updateLocationRequest struct {
 	Timezone string  `json:"timezone"`
 }
 
-// Response Structures
-
 type SingleLocationResponse struct {
 	Location domain.Location `json:"location"`
 }
@@ -61,8 +52,6 @@ type SingleLocationResponse struct {
 type MultipleLocationResponse struct {
 	Locations []domain.Location `json:"locations"`
 }
-
-// Handlers
 
 // CreateLocation creates a new location under the business identified by businessId.
 //
@@ -214,13 +203,14 @@ func (h *LocationHandler) DeleteLocation(w http.ResponseWriter, r *http.Request)
 
 func (h *LocationHandler) SetupRoutes(r chi.Router) {
 	r.Route("/businesses/{businessId}/locations", func(r chi.Router) {
-		// Identity Only
 		r.Group(func(r chi.Router) {
 			r.Use(RequireBusinessMember(h.authService, h.jwtSecret))
 			r.Get("/", h.GetAllLocations)
 			r.Post("/", h.CreateLocation)
 		})
-		// Location (thus Business!) scoped
+		// RequireLocationMember's join is the only thing proving {locationId}
+		// belongs to {businessId}: LocationService's update and delete don't
+		// recheck it, so these routes must never move to RequireBusinessMember.
 		r.Route("/{locationId}", func(r chi.Router) {
 			r.Use(RequireLocationMember(h.authService, h.jwtSecret))
 			r.Get("/", h.GetLocation)

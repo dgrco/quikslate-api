@@ -12,29 +12,21 @@ import (
 // to work within a business. A LocationLead or Manager may edit an
 // employee's positions only if they share at least one location with that
 // employee; anything outside that overlap requires a business admin.
-
 type EmployeeService struct {
 	repo domain.Repo
 }
 
-// NewEmployeeService constructs an EmployeeService backed by repo.
 func NewEmployeeService(repo domain.Repo) *EmployeeService {
 	return &EmployeeService{
 		repo,
 	}
 }
 
-// validateEmployeePositionAction passes if either the caller is an admin, or
-// the caller is one of: LocationLead, Manager and the caller belongs to at least
-// one of the locations that the target belongs to.
 func (es *EmployeeService) validateEmployeePositionAction(ctx context.Context, targetUserId string) error {
 	if ctxkeys.GetIsAdmin(ctx) {
 		return nil
 	}
 
-	// perform location intersection search:
-	// if the target user belongs to at least one
-	// location of the caller, then it is validated.
 	businessId := ctxkeys.GetBusinessId(ctx)
 	callerLocations, err := es.repo.GetLocationRolesByUserAndBusiness(ctx, ctxkeys.GetUserId(ctx), businessId)
 	if err != nil {
@@ -44,7 +36,6 @@ func (es *EmployeeService) validateEmployeePositionAction(ctx context.Context, t
 	if err != nil {
 		return err
 	}
-	// check intersection
 	for _, callerLoc := range callerLocations {
 		if callerLoc.Role != domain.LocationLead && callerLoc.Role != domain.Manager {
 			continue
@@ -69,12 +60,10 @@ func (es *EmployeeService) AddPosition(
 		return fmt.Errorf("failed to add position to employee: %w", err)
 	}
 
-	// check if userId belongs to the same business
 	if _, err := es.repo.GetBusinessMember(ctx, userId, ctxkeys.GetBusinessId(ctx)); err != nil {
 		return fmt.Errorf("failed to add position to employee: %w", err)
 	}
 
-	// verify positionId belongs to the caller's business
 	if _, err := getAndValidatePosition(ctx, es.repo, positionId); err != nil {
 		return fmt.Errorf("failed to add position to employee: %w", err)
 	}
@@ -97,12 +86,10 @@ func (es *EmployeeService) RemovePosition(
 		return fmt.Errorf("failed to remove position from employee: %w", err)
 	}
 
-	// check if userId belongs to the same business
 	if _, err := es.repo.GetBusinessMember(ctx, userId, ctxkeys.GetBusinessId(ctx)); err != nil {
 		return fmt.Errorf("failed to remove position from employee: %w", err)
 	}
 
-	// verify positionId belongs to the caller's business
 	if _, err := getAndValidatePosition(ctx, es.repo, positionId); err != nil {
 		return fmt.Errorf("failed to remove position from employee: %w", err)
 	}
@@ -125,7 +112,6 @@ func (es *EmployeeService) GetAllPositionsByUser(
 		return nil, fmt.Errorf("failed to get all positions by user: %w", err)
 	}
 
-	// check if userId belongs to the same business
 	bm, err := es.repo.GetBusinessMember(ctx, userId, ctxkeys.GetBusinessId(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all positions by user: %w", err)

@@ -10,18 +10,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// This file implements the employee handler: assigning and removing the
-// positions (job roles) a business member is qualified to work, and listing
-// them.
-
 type EmployeeHandler struct {
 	employeeService *service.EmployeeService
 	authService     *service.AuthService
 	jwtSecret       string
 }
 
-// NewEmployeeHandler constructs an EmployeeHandler backed by employeeService
-// and authService.
 func NewEmployeeHandler(
 	employeeService *service.EmployeeService,
 	authService *service.AuthService,
@@ -34,19 +28,13 @@ func NewEmployeeHandler(
 	}
 }
 
-// Request Body Structures
-
 type addPositionRequest struct {
 	PositionId string `json:"position_id"`
 }
 
-// Response Structures
-
 type MultipleEmployeePositionResponse struct {
 	Positions []domain.EmployeePosition `json:"positions"`
 }
-
-// Handlers
 
 // AddPosition assigns a position to the target user identified by userId.
 //

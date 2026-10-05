@@ -13,13 +13,9 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// This file implements the three chi auth middlewares that build up request
-// context via internal/ctxkeys, in increasing specificity: RequireIdentity
-// (userId only), RequireBusinessMember (adds business-scoped authz), and
-// RequireLocationMember (adds location-scoped authz). Pick the least
-// specific one a route's params allow: RequireIdentity when there is no
-// {businessId}, RequireBusinessMember when there is no {locationId}, and
-// RequireLocationMember only when the route has both.
+// Pick the least specific middleware a route's params allow: RequireIdentity
+// when there is no {businessId}, RequireBusinessMember when there is no
+// {locationId}, and RequireLocationMember only when the route has both.
 
 func parseAccessToken(r *http.Request, jwtSecret string) (*auth.AccessTokenClaims, error) {
 	header := r.Header.Get("Authorization")
@@ -27,7 +23,6 @@ func parseAccessToken(r *http.Request, jwtSecret string) (*auth.AccessTokenClaim
 		return nil, domain.ErrUnauthorized
 	}
 
-	// Validate and get JWT claims
 	tokenStr := strings.TrimPrefix(header, "Bearer ")
 	claims, err := auth.ValidateAccessToken(tokenStr, jwtSecret)
 	if err != nil {
@@ -37,7 +32,6 @@ func parseAccessToken(r *http.Request, jwtSecret string) (*auth.AccessTokenClaim
 	return claims, nil
 }
 
-// RequireIdentity parses the Access Token to extract the userId.
 func RequireIdentity(authService *service.AuthService, jwtSecret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -53,9 +47,6 @@ func RequireIdentity(authService *service.AuthService, jwtSecret string) func(ht
 	}
 }
 
-// RequireBusinessMember is a superset of RequireIdentity which uses businessId
-// to extract business-scoped authz information.
-// Use this only if the param takes a businessId parameter and is ONLY business-scoped.
 func RequireBusinessMember(authService *service.AuthService, jwtSecret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -65,7 +56,6 @@ func RequireBusinessMember(authService *service.AuthService, jwtSecret string) f
 				return
 			}
 
-			// Call authorization function on user
 			businessId := chi.URLParam(r, "businessId")
 			authzCtx, err := authService.GetBusinessMemberAuthzContext(r.Context(), claims.UserId, businessId)
 			if err != nil {
@@ -82,9 +72,6 @@ func RequireBusinessMember(authService *service.AuthService, jwtSecret string) f
 	}
 }
 
-// RequireLocationMember is a superset of RequireIdentity which uses businessId
-// and locationId to extract business-and-location-scoped authz information.
-// Use this only if the param takes both {businessId, locationId} parameters.
 func RequireLocationMember(authService *service.AuthService, jwtSecret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +81,6 @@ func RequireLocationMember(authService *service.AuthService, jwtSecret string) f
 				return
 			}
 
-			// Call authorization function on user
 			businessId := chi.URLParam(r, "businessId")
 			locationId := chi.URLParam(r, "locationId")
 			authzCtx, err := authService.GetLocationMemberAuthzContext(r.Context(), claims.UserId, businessId, locationId)

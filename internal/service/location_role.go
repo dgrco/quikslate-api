@@ -13,12 +13,10 @@ import (
 // LocationLead) at a location. All of the role-hierarchy authorization
 // rules from authorization_checks.go apply here since this is where roles
 // are actually granted and revoked.
-
 type LocationRoleService struct {
 	repo domain.Repo
 }
 
-// NewLocationRoleService constructs a LocationRoleService backed by repo.
 func NewLocationRoleService(repo domain.Repo) *LocationRoleService {
 	return &LocationRoleService{
 		repo,

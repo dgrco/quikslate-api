@@ -19,6 +19,8 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       SECURE_MODE: ${SECURE_MODE}
       CORS_ORIGINS: ${CORS_ORIGINS}
+      MAILER: ${MAILER}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL}
     depends_on:
       migrate:
         condition: service_completed_successfully

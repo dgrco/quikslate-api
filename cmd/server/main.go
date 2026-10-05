@@ -14,6 +14,7 @@ import (
 	_ "github.com/dgrco/quikslate/docs"
 	"github.com/dgrco/quikslate/internal/config"
 	"github.com/dgrco/quikslate/internal/database"
+	"github.com/dgrco/quikslate/internal/domain"
 	"github.com/dgrco/quikslate/internal/handler"
 	"github.com/dgrco/quikslate/internal/infra/mail"
 	"github.com/dgrco/quikslate/internal/infra/repo"
@@ -48,7 +49,16 @@ func main() {
 
 	pgRepo := repo.NewPgRepository(pool)
 
-	mailer := mail.NewLoggerMailer("test.example") // TODO: use env
+	var mailer domain.Mailer
+	switch cfg.Mailer {
+	case "log":
+		if cfg.IsSecureMode() {
+			log.Fatalf("cannot use a LoggerMailer (MAILER=log) in secure mode. Set a production mailer in secure mode, or turn secure mode off")
+		}
+		mailer = mail.NewLoggerMailer(cfg.FrontendBaseURL)
+	default:
+		log.Fatalf("invalid mailer config: %q", cfg.Mailer)
+	}
 
 	authService := service.NewAuthService(pgRepo, mailer, cfg.JWTSecret)
 	authHandler := handler.NewAuthHandler(authService, cfg.JWTSecret, cfg.IsSecureMode())

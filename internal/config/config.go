@@ -9,11 +9,13 @@ import (
 )
 
 type Config struct {
-	ApiPort     string
-	DatabaseUrl string
-	JWTSecret   string
-	SecureMode  string
-	CorsOrigins string
+	ApiPort         string
+	DatabaseUrl     string
+	JWTSecret       string
+	SecureMode      string
+	CorsOrigins     string
+	Mailer          string
+	FrontendBaseURL string
 }
 
 func Load() *Config {
@@ -22,11 +24,13 @@ func Load() *Config {
 	_ = godotenv.Load(".env")
 
 	return &Config{
-		ApiPort:     getEnv("API_PORT", "8080"),
-		DatabaseUrl: mustGetEnv("DATABASE_URL"),
-		JWTSecret:   mustGetEnv("JWT_SECRET"),
-		SecureMode:  getEnv("SECURE_MODE", "true"),
-		CorsOrigins: getEnv("CORS_ORIGINS", "http://localhost:5173"),
+		ApiPort:         getEnv("API_PORT", "8080"),
+		DatabaseUrl:     mustGetEnv("DATABASE_URL"),
+		JWTSecret:       mustGetEnv("JWT_SECRET"),
+		SecureMode:      getEnv("SECURE_MODE", "true"),
+		CorsOrigins:     getEnv("CORS_ORIGINS", "http://localhost:5173"),
+		Mailer:          mustGetEnv("MAILER"),
+		FrontendBaseURL: mustGetEnv("FRONTEND_BASE_URL"),
 	}
 }
 

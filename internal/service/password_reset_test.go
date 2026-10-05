@@ -12,6 +12,7 @@ import (
 
 	"github.com/dgrco/quikslate/internal/auth"
 	"github.com/dgrco/quikslate/internal/domain"
+	"github.com/dgrco/quikslate/internal/infra/mail/mailtest"
 )
 
 // Tests for the password reset flow. The failures worth catching here are all
@@ -50,7 +51,6 @@ type resetCall struct {
 type fakeResetRepo struct {
 	domain.Repo
 
-	// Canned answers.
 	user        domain.User
 	userErr     error // GetUserByEmail
 	userByIdErr error // GetUserById
@@ -187,79 +187,87 @@ func newFakeResetRepo(t *testing.T) *fakeResetRepo {
 // enumeration oracle, and merely swallowing the error without returning
 // early is worse: execution falls through with a zero-valued user, so the
 // writes below run with an empty string where a UUID belongs.
-func TestCreatePasswordResetTokenUnknownEmailIsSilent(t *testing.T) {
+func TestSendPasswordResetTokenUnknownEmailIsSilent(t *testing.T) {
 	repo := newFakeResetRepo(t)
 	repo.userErr = domain.ErrNotFound
-	svc := NewAuthService(repo, "test-secret")
+	mailer := mailtest.NewMailer()
+	svc := NewAuthService(repo, mailer, "test-secret")
 
-	token, err := svc.CreatePasswordResetToken(context.Background(), resetUserEmail)
+	err := svc.SendPasswordResetToken(context.Background(), resetUserEmail)
 	if err != nil {
 		t.Fatalf("unknown email should not error, got %v", err)
 	}
-	if token != "" {
-		t.Errorf("unknown email should yield no token to mail, got %q", token)
-	}
 	if repo.wrote() {
 		t.Errorf("unknown email must not write; calls were %v", repo.calls)
+	}
+	if mailer.DidSendMail() {
+		t.Error("the mailer sent to an unknown email")
 	}
 }
 
 // The quiet path above is only for "no such account". A failing database
 // still has to surface, or every reset silently no-ops during an outage.
-func TestCreatePasswordResetTokenPropagatesRealErrors(t *testing.T) {
+func TestSendPasswordResetTokenPropagatesRealErrors(t *testing.T) {
 	repo := newFakeResetRepo(t)
 	repo.userErr = errors.New("connection refused")
-	svc := NewAuthService(repo, "test-secret")
+	mailer := mailtest.NewMailer()
+	svc := NewAuthService(repo, mailer, "test-secret")
 
-	token, err := svc.CreatePasswordResetToken(context.Background(), resetUserEmail)
+	err := svc.SendPasswordResetToken(context.Background(), resetUserEmail)
 	if err == nil {
-		t.Fatal("a database failure must not be reported as success")
+		t.Error("a database failure must not be reported as success")
 	}
-	if token != "" {
-		t.Errorf("no token should be returned on error, got %q", token)
+	if mailer.DidSendMail() {
+		t.Error("mail was sent despite a database failure")
 	}
 }
 
 // The token is a bearer credential: the plaintext goes in the email and only
 // its hash may reach the table, so a database leak can't be replayed. Storing
 // the raw token behaves identically in every functional test.
-func TestCreatePasswordResetTokenStoresOnlyTheHash(t *testing.T) {
+func TestSendPasswordResetTokenStoresOnlyTheHash(t *testing.T) {
 	repo := newFakeResetRepo(t)
-	svc := NewAuthService(repo, "test-secret")
+	mailer := mailtest.NewMailer()
+	svc := NewAuthService(repo, mailer, "test-secret")
 
-	token, err := svc.CreatePasswordResetToken(context.Background(), resetUserEmail)
+	err := svc.SendPasswordResetToken(context.Background(), resetUserEmail)
 	if err != nil {
-		t.Fatalf("CreatePasswordResetToken: %v", err)
+		t.Fatalf("SendPasswordResetToken: %v", err)
 	}
-	if token == "" {
+	mailCall := mailer.Find("SendForgotPassword")
+	if mailCall == nil {
+		t.Fatal("SendForgotPassword not called")
+	}
+	if mailCall.Token == "" {
 		t.Fatal("a known address must yield a token")
 	}
 
-	created := repo.find("CreatePasswordResetToken")
-	if created == nil {
+	resetCall := repo.find("CreatePasswordResetToken")
+	if resetCall == nil {
 		t.Fatal("no token was persisted")
 	}
-	if created.hash == token {
+	if resetCall.hash == mailCall.Token {
 		t.Fatal("the plaintext token was stored; only its hash may be persisted")
 	}
-	if want := sha256Hex(token); created.hash != want {
-		t.Errorf("stored hash = %q, want sha256 of the returned token %q", created.hash, want)
+	if want := sha256Hex(mailCall.Token); resetCall.hash != want {
+		t.Errorf("stored hash = %q, want sha256 of the emailed token %q", resetCall.hash, want)
 	}
-	if created.userId != resetUserId {
-		t.Errorf("token stored against user %q, want %q", created.userId, resetUserId)
+	if resetCall.userId != resetUserId {
+		t.Errorf("token stored against user %q, want %q", resetCall.userId, resetUserId)
 	}
 }
 
 // Only one token may be outstanding per user, and the order is what enforces
 // it. Creating before revoking deletes the token that was just issued, so
 // every reset link in the mail is dead on arrival -- while this function
-// still returns it with no error.
-func TestCreatePasswordResetTokenRevokesBeforeIssuing(t *testing.T) {
+// stillreturns it with no error.
+func TestSendPasswordResetTokenRevokesBeforeIssuing(t *testing.T) {
 	repo := newFakeResetRepo(t)
-	svc := NewAuthService(repo, "test-secret")
+	mailer := mailtest.NewMailer()
+	svc := NewAuthService(repo, mailer, "test-secret")
 
-	if _, err := svc.CreatePasswordResetToken(context.Background(), resetUserEmail); err != nil {
-		t.Fatalf("CreatePasswordResetToken: %v", err)
+	if err := svc.SendPasswordResetToken(context.Background(), resetUserEmail); err != nil {
+		t.Fatalf("SendPasswordResetToken: %v", err)
 	}
 
 	revoked := repo.indexOf("RevokePasswordResetTokensByUserId")
@@ -275,21 +283,46 @@ func TestCreatePasswordResetTokenRevokesBeforeIssuing(t *testing.T) {
 // Registration lowercases before storing and the lookup matches exactly, so
 // without normalization here a user who capitalizes their address falls into
 // the deliberately-silent no-account path and simply never receives mail.
-func TestCreatePasswordResetTokenNormalizesEmail(t *testing.T) {
+func TestSendPasswordResetTokenNormalizesEmail(t *testing.T) {
 	repo := newFakeResetRepo(t)
-	svc := NewAuthService(repo, "test-secret")
+	mailer := mailtest.NewMailer()
+	svc := NewAuthService(repo, mailer, "test-secret")
 
 	mixed := "User@Example.COM"
-	if _, err := svc.CreatePasswordResetToken(context.Background(), mixed); err != nil {
-		t.Fatalf("CreatePasswordResetToken: %v", err)
+	if err := svc.SendPasswordResetToken(context.Background(), mixed); err != nil {
+		t.Fatalf("SendPasswordResetToken: %v", err)
 	}
 
-	lookup := repo.find("GetUserByEmail")
-	if lookup == nil {
+	userLookup := repo.find("GetUserByEmail")
+	if userLookup == nil {
 		t.Fatal("no lookup was performed")
 	}
-	if lookup.email != strings.ToLower(mixed) {
-		t.Errorf("looked up %q, want the normalized %q", lookup.email, strings.ToLower(mixed))
+	if userLookup.email != strings.ToLower(mixed) {
+		t.Errorf("looked up %q, want the normalized %q", userLookup.email, strings.ToLower(mixed))
+	}
+}
+
+// The reset email must be sent to the stored user's email, never to a requested email.
+// If the requested email maps to a real account via loose matching logic, and it is
+// sent to the requested email, then an attacker could get the reset link if they own 
+// that email.
+func TestSendPasswordResetTokenEmailsStoredUserEmail(t *testing.T) {
+	repo := newFakeResetRepo(t)
+	mailer := mailtest.NewMailer()
+	svc := NewAuthService(repo, mailer, "test-secret")
+
+	// repo.user is returned from GetUserByEmail regardless of the email, so this acts like a match
+	email := "email.that.does.not.equal.yet.matches.stored.user@example.com"
+	if err := svc.SendPasswordResetToken(context.Background(), email); err != nil {
+		t.Fatalf("SendPasswordResetToken: %v", err)
+	}
+
+	mailerCall := mailer.Find("SendForgotPassword")
+	if mailerCall == nil {
+		t.Fatal("no mailer call was performed")
+	}
+	if mailerCall.ReceiverEmail != repo.user.Email {
+		t.Errorf("mailer sent to %q, expected it to send to %q", mailerCall.ReceiverEmail, repo.user.Email)
 	}
 }
 
@@ -317,7 +350,8 @@ func TestUsePasswordResetTokenRejectsUnusableTokens(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := newFakeResetRepo(t)
 			tc.setup(repo)
-			svc := NewAuthService(repo, "test-secret")
+			mailer := mailtest.NewMailer()
+			svc := NewAuthService(repo, mailer, "test-secret")
 
 			err := svc.UsePasswordResetToken(context.Background(), resetNewPass, "some-token")
 			if !errors.Is(err, domain.ErrInvalidPasswordResetToken) {
@@ -340,7 +374,8 @@ func TestUsePasswordResetTokenRejectsUnusableTokens(t *testing.T) {
 // the token -- otherwise a mistyped attempt costs the user their reset link.
 func TestUsePasswordResetTokenRejectsUnchangedPassword(t *testing.T) {
 	repo := newFakeResetRepo(t)
-	svc := NewAuthService(repo, "test-secret")
+	mailer := mailtest.NewMailer()
+	svc := NewAuthService(repo, mailer, "test-secret")
 
 	err := svc.UsePasswordResetToken(context.Background(), resetOldPass, "some-token")
 	if !errors.Is(err, domain.ErrSamePassword) {
@@ -359,7 +394,8 @@ func TestUsePasswordResetTokenRejectsUnchangedPassword(t *testing.T) {
 // registration enforces.
 func TestUsePasswordResetTokenValidatesPasswordFirst(t *testing.T) {
 	repo := newFakeResetRepo(t)
-	svc := NewAuthService(repo, "test-secret")
+	mailer := mailtest.NewMailer()
+	svc := NewAuthService(repo, mailer, "test-secret")
 
 	if err := svc.UsePasswordResetToken(context.Background(), "short", "some-token"); err == nil {
 		t.Fatal("a too-short password must be rejected")
@@ -374,7 +410,8 @@ func TestUsePasswordResetTokenValidatesPasswordFirst(t *testing.T) {
 // points the password write at an id that does not identify a user.
 func TestUsePasswordResetTokenSuccess(t *testing.T) {
 	repo := newFakeResetRepo(t)
-	svc := NewAuthService(repo, "test-secret")
+	mailer := mailtest.NewMailer()
+	svc := NewAuthService(repo, mailer, "test-secret")
 
 	presented := "the-emailed-token"
 	if err := svc.UsePasswordResetToken(context.Background(), resetNewPass, presented); err != nil {

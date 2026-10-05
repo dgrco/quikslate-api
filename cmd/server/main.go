@@ -15,6 +15,7 @@ import (
 	"github.com/dgrco/quikslate/internal/config"
 	"github.com/dgrco/quikslate/internal/database"
 	"github.com/dgrco/quikslate/internal/handler"
+	"github.com/dgrco/quikslate/internal/infra/mail"
 	"github.com/dgrco/quikslate/internal/infra/repo"
 	"github.com/dgrco/quikslate/internal/response"
 	"github.com/dgrco/quikslate/internal/service"
@@ -47,7 +48,9 @@ func main() {
 
 	pgRepo := repo.NewPgRepository(pool)
 
-	authService := service.NewAuthService(pgRepo, cfg.JWTSecret)
+	mailer := mail.NewLoggerMailer("test.example") // TODO: use env
+
+	authService := service.NewAuthService(pgRepo, mailer, cfg.JWTSecret)
 	authHandler := handler.NewAuthHandler(authService, cfg.JWTSecret, cfg.IsSecureMode())
 
 	businessService := service.NewBusinessService(pgRepo)
@@ -98,7 +101,7 @@ func main() {
 	// like a routing change.
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			response.WriteJSON(w, handler.SimpleResponse{Message: "Hi from Quikslate :)"}, http.StatusOK)
+			response.WriteJSON(w, handler.SimpleResponse{Message: "Hello from QuikSlate!"}, http.StatusOK)
 		})
 
 		r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {

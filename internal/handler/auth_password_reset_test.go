@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dgrco/quikslate/internal/domain"
+	"github.com/dgrco/quikslate/internal/infra/mail/mailtest"
 	"github.com/dgrco/quikslate/internal/service"
 )
 
@@ -81,11 +82,10 @@ type noopTx struct{}
 func (noopTx) Commit(ctx context.Context) error   { return nil }
 func (noopTx) Rollback(ctx context.Context) error { return nil }
 
-// newAuthHandler builds a handler in production mode. secure=true matters:
-// it is the flag that suppresses the development-only token logging, so these
-// tests exercise the behavior that actually ships.
 func newAuthHandler(repo domain.Repo) *AuthHandler {
-	return NewAuthHandler(service.NewAuthService(repo, "test-secret"), "test-secret", true)
+	fakeMailer := mailtest.NewMailer()
+	authService := service.NewAuthService(repo, fakeMailer, "test-secret")
+	return NewAuthHandler(authService, "test-secret", true)
 }
 
 func postJSON(t *testing.T, h http.HandlerFunc, body any) *httptest.ResponseRecorder {

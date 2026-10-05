@@ -15,18 +15,12 @@ import (
 	"github.com/go-chi/httprate"
 )
 
-// This file implements the auth handler: registration, login, refresh-token
-// rotation, and logout, plus the HttpOnly refresh_token cookie helper shared
-// by all four.
-
 type AuthHandler struct {
 	authService *service.AuthService
 	jwtSecret   string
-	secure      bool // should be true in production and false in development (set in Config.SecureMode)
+	secure      bool
 }
 
-// NewAuthHandler creates an AuthHandler object.
-// The secure parameter refers to whether we are in a prod or dev environment.
 func NewAuthHandler(authService *service.AuthService, jwtSecret string, secure bool) *AuthHandler {
 	return &AuthHandler{
 		authService,
@@ -34,8 +28,6 @@ func NewAuthHandler(authService *service.AuthService, jwtSecret string, secure b
 		secure,
 	}
 }
-
-// Request Body Structures
 
 type registerRequest struct {
 	Email    string `json:"email"`
@@ -62,19 +54,13 @@ type resetPasswordRequest struct {
 	NewPassword string `json:"new_password"`
 }
 
-// Response Structures
-
 type TokenResponse struct {
 	AccessToken string `json:"access_token"`
 }
 
-// Helpers
-
 func isEmpty(str string) bool {
 	return strings.TrimSpace(str) == ""
 }
-
-// Handlers
 
 // Register creates a new user account.
 //
@@ -97,7 +83,6 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// validate request
 	if isEmpty(req.Email) || isEmpty(req.Name) || isEmpty(req.Password) {
 		response.WriteError(w, "email, name, and password are required", http.StatusBadRequest)
 		return
@@ -133,7 +118,6 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// validate request
 	if isEmpty(req.Email) || isEmpty(req.Password) {
 		response.WriteError(w, "email and password are required", http.StatusBadRequest)
 		return
@@ -187,7 +171,7 @@ func ClearCookie(w http.ResponseWriter, secure bool) {
 		HttpOnly: true,
 		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:   -1, // set the cookie as expired
+		MaxAge:   -1,
 	})
 }
 
@@ -204,15 +188,16 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	cookie, err := r.Cookie("refresh_token")
 	if err != nil {
-		ClearCookie(w, h.secure) // harmless if already absent, ensures consistent response
+		ClearCookie(w, h.secure)
 		response.WriteJSON(w, SimpleResponse{Message: "ok"}, http.StatusOK)
 		return
 	}
 	refreshToken := cookie.Value
 
+	// ErrNotFound means the token was already revoked or expired, which is
+	// the state logout wants to reach, so it is success, not an error.
 	err = h.authService.Logout(r.Context(), refreshToken)
 	if err != nil && !errors.Is(err, domain.ErrNotFound) {
-		// again, on ErrNotFound we skip error handling since we want a consistent response
 		log.Printf("logout: %v", err)
 		response.WriteError(w, ERR_INTERNAL_SERVER, http.StatusInternalServerError)
 		return
@@ -247,22 +232,9 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.authService.CreatePasswordResetToken(r.Context(), req.Email)
-	if err != nil {
+	if err := h.authService.SendPasswordResetToken(r.Context(), req.Email); err != nil {
 		handleServiceError(w, err, "forgot password")
 		return
-	}
-
-	// An empty token means the address has no account. Fall through to the
-	// same 202 rather than branching, so the two cases are indistinguishable.
-	if token != "" {
-		// TODO: hand the token to a mailer. Until one exists the reset link
-		// can only be retrieved out of band, so log it in development only —
-		// a reset token in a production log is a credential sitting in
-		// plaintext for anyone with log access.
-		if !h.secure {
-			log.Printf("forgot password: reset token for %s: %s", req.Email, token)
-		}
 	}
 
 	response.WriteJSON(w, SimpleResponse{Message: "if that email has an account, a reset link has been sent"}, http.StatusAccepted)
@@ -318,15 +290,13 @@ func setRefreshTokenCookie(w http.ResponseWriter, token string, secure bool) {
 		// the cookie rides along only on the two endpoints that consume it,
 		// refresh and logout, rather than on every API call.
 		Path:     "/v1/auth",
-		MaxAge:   30 * 24 * 60 * 60, // 30 days
+		MaxAge:   30 * 24 * 60 * 60,
 		HttpOnly: true,
 	})
 }
 
-// SetupRoutes registers the auth route group and its subroutes
 func (h *AuthHandler) SetupRoutes(r chi.Router) {
 	r.Route("/auth", func(r chi.Router) {
-		// rate-limit by IP (may add per-email rate-limiting via redis in the future)
 		r.Group(func(r chi.Router) {
 			r.Use(httprate.LimitByRealIP(60, 1*time.Minute))
 			r.Post("/register", h.Register)

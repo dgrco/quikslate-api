@@ -304,7 +304,7 @@ func TestSendPasswordResetTokenNormalizesEmail(t *testing.T) {
 
 // The reset email must be sent to the stored user's email, never to a requested email.
 // If the requested email maps to a real account via loose matching logic, and it is
-// sent to the requested email, then an attacker could get the reset link if they own 
+// sent to the requested email, then an attacker could get the reset link if they own
 // that email.
 func TestSendPasswordResetTokenEmailsStoredUserEmail(t *testing.T) {
 	repo := newFakeResetRepo(t)

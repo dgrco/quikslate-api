@@ -2,19 +2,16 @@ package main
 
 import (
 	"database/sql"
-	"embed"
 	"log"
 	"os"
 	"strings"
 
+	"github.com/dgrco/quikslate/cmd/migrate/migrations"
 	"github.com/joho/godotenv"
 	"github.com/pressly/goose/v3"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
-
-//go:embed migrations/*.sql
-var embedMigrations embed.FS
 
 func main() {
 	args := os.Args
@@ -36,7 +33,7 @@ func main() {
 	}
 	defer db.Close()
 
-	goose.SetBaseFS(embedMigrations)
+	goose.SetBaseFS(migrations.EmbedMigrations)
 
 	if err := goose.SetDialect("postgres"); err != nil {
 		log.Fatalf("failed to set SQL dialect: %v", err)
@@ -44,17 +41,17 @@ func main() {
 
 	switch migrationAction {
 	case "up":
-		if err := goose.Up(db, "migrations"); err != nil {
+		if err := goose.Up(db, "."); err != nil {
 			log.Fatalf("failed to migrate up: %v", err)
 		}
 		log.Println("migrate up succeeded")
 	case "down":
-		if err := goose.Down(db, "migrations"); err != nil {
+		if err := goose.Down(db, "."); err != nil {
 			log.Fatalf("failed to migrate down (by 1): %v", err)
 		}
 		log.Println("migrate down succeeded")
 	case "reset":
-		if err := goose.Reset(db, "migrations"); err != nil {
+		if err := goose.Reset(db, "."); err != nil {
 			log.Fatalf("failed to reset migrations: %v", err)
 		}
 		log.Println("migrate reset succeeded")

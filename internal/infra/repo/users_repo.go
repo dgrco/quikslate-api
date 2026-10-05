@@ -10,9 +10,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// users_repo.go implements domain.UserRepository: CRUD for user accounts,
-// independent of any business membership.
-
 const (
 	createUserQuery = `
 		INSERT INTO users (email, name, password)
@@ -35,7 +32,6 @@ const (
 	`
 )
 
-// scanUser scans a single row into a domain.User.
 func scanUser(row pgx.Row) (domain.User, error) {
 	var u domain.User
 	err := row.Scan(

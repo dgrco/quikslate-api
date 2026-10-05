@@ -10,11 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// refresh_tokens_repo.go implements domain.RefreshTokenRepository: storing
-// and looking up the hashed refresh tokens behind session renewal. See
-// AuthService.Refresh in internal/service/auth.go for the rotate-on-use
-// scheme these queries back.
-
 const (
 	createRefreshTokenQuery = `
 		INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
@@ -36,7 +31,6 @@ const (
 	`
 )
 
-// scanRefreshToken scans a single row into a domain.RefreshToken.
 func scanRefreshToken(row pgx.Row) (domain.RefreshToken, error) {
 	var t domain.RefreshToken
 	err := row.Scan(
@@ -92,7 +86,6 @@ func (r *PgRepository) DeleteRefreshToken(ctx context.Context, tokenHash string)
 	return nil
 }
 
-// RevokeRefreshTokensByUserId revokes all refresh tokens of a User.
 func (r *PgRepository) RevokeRefreshTokensByUserId(ctx context.Context, userId string) error {
 	if _, err := r.exec.Exec(ctx, revokeRefreshTokensByUserIdQuery, userId); err != nil {
 		return fmt.Errorf("failed to revoke refresh tokens: %w", err)

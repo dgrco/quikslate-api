@@ -10,12 +10,10 @@ import (
 
 // LocationService manages a business's locations: the physical sites where
 // positions are offered and shifts are scheduled.
-
 type LocationService struct {
 	repo domain.Repo
 }
 
-// NewLocationService constructs a LocationService backed by repo.
 func NewLocationService(repo domain.Repo) *LocationService {
 	return &LocationService{
 		repo,
@@ -28,7 +26,7 @@ func NewLocationService(repo domain.Repo) *LocationService {
 func (ls *LocationService) CreateLocation(
 	ctx context.Context,
 	locationName string,
-	address *string, // optional
+	address *string,
 	timezone string,
 ) (domain.Location, error) {
 	if err := validateIsAdmin(ctx); err != nil {

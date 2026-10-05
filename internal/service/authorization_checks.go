@@ -13,7 +13,6 @@ import (
 // Middleware (internal/handler) only establishes who the caller is; these
 // functions decide what that caller is allowed to do.
 
-// validateIsAdmin returns ErrForbidden if the requestor is not an admin.
 func validateIsAdmin(ctx context.Context) error {
 	if !ctxkeys.GetIsAdmin(ctx) {
 		return domain.ErrForbidden
@@ -32,7 +31,6 @@ func getAndValidateLocation(
 	if err != nil {
 		return domain.Location{}, err
 	}
-	// Check if the Location's business ID matches the business ID set in the context (the user's business ID)
 	if l.BusinessId != ctxkeys.GetBusinessId(ctx) {
 		return domain.Location{}, domain.ErrForbidden
 	}

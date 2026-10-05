@@ -24,10 +24,6 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
-// main.go is the composition root: it loads config, connects to the
-// database, wires a PgRepository into each service and each service into
-// its handler, and starts the chi router.
-
 // @title						QuikSlate API
 // @version					1.0
 // @description				Scheduling API for businesses, locations, positions, shifts, and employees.
@@ -36,14 +32,11 @@ import (
 // @in							header
 // @name						Authorization
 func main() {
-	// Load environment
 	cfg := config.Load()
 
-	// Set up SIGINT/SIGTERM catching context
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Connect to database
 	pool, err := database.Connect(cfg.DatabaseUrl)
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
@@ -54,11 +47,9 @@ func main() {
 
 	pgRepo := repo.NewPgRepository(pool)
 
-	// Auth service/handler
 	authService := service.NewAuthService(pgRepo, cfg.JWTSecret)
 	authHandler := handler.NewAuthHandler(authService, cfg.JWTSecret, cfg.IsSecureMode())
 
-	// Other service/handlers
 	businessService := service.NewBusinessService(pgRepo)
 	businessHandler := handler.NewBusinessHandler(businessService, authService, cfg.JWTSecret)
 
@@ -83,7 +74,6 @@ func main() {
 	userService := service.NewUserService(pgRepo)
 	userHandler := handler.NewUserHandler(userService, authService, cfg.JWTSecret, cfg.IsSecureMode())
 
-	// Setup router
 	r := chi.NewRouter()
 	r.Use(chiMiddleware.Logger)
 	r.Use(chiMiddleware.Recoverer)
@@ -95,8 +85,6 @@ func main() {
 		MaxAge:           300,
 	}))
 
-	// Route Setup
-	//
 	// Everything the API serves lives under /v1. In production a single
 	// origin serves both halves of the app: the reverse proxy sends /v1/* to
 	// this server and every other path to the frontend, so the prefix is what
@@ -113,7 +101,6 @@ func main() {
 			response.WriteJSON(w, handler.SimpleResponse{Message: "Hi from Quikslate :)"}, http.StatusOK)
 		})
 
-		// Health endpoint(s)
 		r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 			if err := pool.Ping(r.Context()); err != nil {
 				response.WriteError(w, "unhealthy", http.StatusInternalServerError)
@@ -129,8 +116,7 @@ func main() {
 			w.WriteHeader(http.StatusOK)
 		})
 
-		// Swagger UI + spec, served at /v1/swagger/index.html. Only exposed
-		// outside secure mode, so prod doesn't hand out a route map for free.
+		// Only outside secure mode, so prod doesn't hand out a route map for free.
 		if !cfg.IsSecureMode() {
 			r.Get("/swagger/*", httpSwagger.WrapHandler)
 		}
@@ -146,34 +132,31 @@ func main() {
 		userHandler.SetupRoutes(r)
 	})
 
-	// Listen
+	// All four timeouts are load-bearing: without them a slow-loris client
+	// holds connections open indefinitely.
 	server := http.Server{
 		Addr:              fmt.Sprintf(":%s", cfg.ApiPort),
 		Handler:           r,
 		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       10 * time.Second, // Max duration reading the entire request
-		WriteTimeout:      15 * time.Second, // Max duration writing the response
-		IdleTimeout:       60 * time.Second, // Max time to keep connections alive
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
-	// Run ListenAndServe in a Goroutine to not block main
 	go func() {
 		log.Printf("Server started on port %s", cfg.ApiPort)
-		// http.ErrServerClosed check is done since server.Shutdown() makes ListenAndServe()
-		// return it, so it is expected.
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("Server error: %v", err)
 		}
 	}()
 
-	// Block until signalled
 	<-ctx.Done()
 	log.Println("Shutdown signal received.")
 
-	// Restore default signal behaviour, this makes Ctrl+C twice force exit.
+	// Restores default signal handling, so a second Ctrl+C force-exits
+	// instead of waiting out the shutdown timeout.
 	stop()
 
-	// Set up shutdown context: this gives in-flight requests time to finish
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

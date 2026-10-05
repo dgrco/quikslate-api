@@ -61,17 +61,14 @@ func (h *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		handleServiceError(w, err, "change password")
 		return
 	}
-	ClearCookie(w, h.secure) // this touches auth, but it's fine here
+	ClearCookie(w, h.secure)
 
 	response.WriteJSON(w, SimpleResponse{Message: "ok"}, http.StatusOK)
 }
 
-// SetupRoutes registers the user route group and its subroutes
 func (h *UserHandler) SetupRoutes(r chi.Router) {
 	r.Route("/users/me", func(r chi.Router) {
-		// Rate Limit (may change to per user rate limiting)
 		r.Use(httprate.LimitByRealIP(60, 1*time.Minute))
-		// Requires at least an Identity session
 		r.Use(RequireIdentity(h.authService, h.jwtSecret))
 
 		r.Post("/change-password", h.ChangePassword)

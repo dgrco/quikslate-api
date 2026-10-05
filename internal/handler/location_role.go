@@ -11,18 +11,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// This file implements the location-role handler: assigning, removing, and
-// listing the per-location roles business members hold, plus listing members
-// eligible to be assigned one.
-
 type LocationRoleHandler struct {
 	locationRoleService *service.LocationRoleService
 	authService         *service.AuthService
 	jwtSecret           string
 }
 
-// NewLocationRoleHandler constructs a LocationRoleHandler backed by
-// locationRoleService and authService.
 func NewLocationRoleHandler(
 	locationRoleService *service.LocationRoleService,
 	authService *service.AuthService,
@@ -35,13 +29,9 @@ func NewLocationRoleHandler(
 	}
 }
 
-// Request Structures
-
 type assignLocationRoleRequest struct {
 	Role domain.LRole `json:"role"`
 }
-
-// Response Structures
 
 type LocationRoleDetailDTO struct {
 	UserId     string       `json:"user_id"`
@@ -57,8 +47,6 @@ type LocationRoleDetailDTO struct {
 type MultipleLocationRoleResponse struct {
 	Roles []LocationRoleDetailDTO `json:"roles"`
 }
-
-// Handlers
 
 // AssignLocationRole assigns or changes the target user's role at the location identified by locationId.
 //

@@ -10,7 +10,6 @@ import (
 // Position is a job role a business offers (e.g. "cashier"), used to
 // categorize shifts and to record which positions an employee is qualified
 // to work, see employee_position.go.
-
 type Position struct {
 	Id         string    `json:"id"`
 	BusinessId string    `json:"business_id"`
@@ -19,8 +18,6 @@ type Position struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
-// ValidatePositionName returns an error if positionName is empty or
-// all-whitespace, or if its too long.
 func ValidatePositionName(positionName string) error {
 	if strings.TrimSpace(positionName) == "" {
 		return NewValidationError("position name cannot be empty")

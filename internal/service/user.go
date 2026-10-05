@@ -18,10 +18,9 @@ func NewUserService(repo domain.Repo) *UserService {
 	}
 }
 
-// ChangePassword is called when the user is authenticated and requires the user to re-enter
-// their password for authentication. Once this password is verified, the password is changed.
-// This is distinct from ResetPassword (auth.go), which happens if the user is unauthenticated.
-// Therefore, this can be called by anyone with at least an Identity session.
+// ChangePassword is the authenticated counterpart to
+// AuthService.UsePasswordResetToken, so it re-verifies currentPassword: a
+// stolen access token alone must not be enough to take over the account.
 func (s *UserService) ChangePassword(ctx context.Context, userId, currentPassword, newPassword string) error {
 	if err := domain.ValidateUserPassword(newPassword); err != nil {
 		return err
@@ -53,8 +52,7 @@ func (s *UserService) ChangePassword(ctx context.Context, userId, currentPasswor
 
 	txRepo := s.repo.WithTx(tx)
 
-	// revoke pending reset tokens... otherwise a pending reset token can be used after already changing
-	// the password.
+	// A reset link mailed before this change would otherwise still work after it.
 	if err := txRepo.RevokePasswordResetTokensByUserId(ctx, u.Id); err != nil {
 		return fmt.Errorf("failed to change password: %w", err)
 	}

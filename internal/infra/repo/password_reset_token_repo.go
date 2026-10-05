@@ -49,8 +49,6 @@ func scanPasswordResetToken(row pgx.Row) (domain.PasswordResetToken, error) {
 	return t, nil
 }
 
-// CreatePasswordResetToken inserts an entry into password_reset_tokens and returns
-// the PasswordResetToken on success and an error on failure.
 func (r *PgRepository) CreatePasswordResetToken(ctx context.Context, userId, tokenHash string, expiresAt time.Time) (domain.PasswordResetToken, error) {
 	t, err := scanPasswordResetToken(
 		r.exec.QueryRow(ctx, createPasswordResetTokenQuery, userId, tokenHash, expiresAt),

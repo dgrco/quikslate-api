@@ -9,10 +9,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// businesses_repo.go implements domain.BusinessRepository: CRUD for the
-// businesses table, the top-level tenant every location, position, and
-// shift belongs to.
-
 const (
 	createBusinessQuery = `
 		INSERT INTO businesses (name)
@@ -41,7 +37,6 @@ const (
 	`
 )
 
-// scanBusiness scans a single row into a domain.Business.
 func scanBusiness(row pgx.Row) (domain.Business, error) {
 	var b domain.Business
 	err := row.Scan(
@@ -56,7 +51,6 @@ func scanBusiness(row pgx.Row) (domain.Business, error) {
 	return b, nil
 }
 
-// CreateBusiness inserts a new business row and returns it.
 func (r *PgRepository) CreateBusiness(ctx context.Context, name string) (domain.Business, error) {
 	b, err := scanBusiness(r.exec.QueryRow(ctx, createBusinessQuery, name))
 	if err != nil {

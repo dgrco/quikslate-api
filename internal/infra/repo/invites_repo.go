@@ -11,10 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// invites_repo.go implements domain.InviteRepository: CRUD for pending
-// invitations that let a business add a new member at a given location and
-// role.
-
 const (
 	createInviteQuery = `
 		INSERT INTO invites (token_hash, email, business_id, location_id, role, expires_at)
@@ -53,8 +49,6 @@ const (
 	`
 )
 
-// scanInviteFields scans a row's invites columns into inv using scan (either
-// row.Scan or rows.Scan).
 func scanInviteFields(inv *domain.Invite, scan func(...any) error) error {
 	if err := scan(
 		&inv.Id,
@@ -73,7 +67,6 @@ func scanInviteFields(inv *domain.Invite, scan func(...any) error) error {
 	return nil
 }
 
-// scanInvite scans a single row into a domain.Invite.
 func scanInvite(row pgx.Row) (domain.Invite, error) {
 	var inv domain.Invite
 	if err := scanInviteFields(&inv, row.Scan); err != nil {

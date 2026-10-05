@@ -2,10 +2,6 @@ package domain
 
 import "errors"
 
-// Sentinel errors and the ValidationError type that internal/service returns
-// and internal/handler/errors.go translates into HTTP responses.
-
-// General Errors
 var (
 	ErrNotFound                  = errors.New("not found")
 	ErrAlreadyExists             = errors.New("already exists")
@@ -20,13 +16,10 @@ var (
 	ErrSamePassword              = NewValidationError("new password must be different from your current password")
 )
 
-// Validation Errors
 type ValidationError struct {
 	Message string
 }
 
-// Error implements the error interface, returning the validation message
-// as-is (it's already meant to be shown to the client).
 func (e *ValidationError) Error() string {
 	return e.Message
 }

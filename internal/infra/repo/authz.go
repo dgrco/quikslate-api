@@ -15,7 +15,7 @@ import (
 
 const (
 	getBusinessMemberAuthzQuery = `
-		SELECT is_admin, is_primary_admin
+		SELECT is_primary_admin, is_admin
 		FROM business_members
 		WHERE user_id = $1 AND business_id = $2
 	`
@@ -26,7 +26,7 @@ const (
 	// non-admins (rejected downstream by a role check) and not for admins
 	// (who bypass role checks entirely).
 	getLocationMemberAuthzQuery = `
-		SELECT bm.is_admin, bm.is_primary_admin, COALESCE(lr.role::text, '') AS role
+		SELECT bm.is_primary_admin, bm.is_admin, COALESCE(lr.role::text, '') AS role
 		FROM business_members bm
 		JOIN locations l
 			ON l.id = $3 AND l.business_id = bm.business_id

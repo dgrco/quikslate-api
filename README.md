@@ -24,7 +24,7 @@ go run ./cmd/server
 ```
 
 ### Swagger Documentation
-Generate up-to-date swagger documetation using:
+Generate up-to-date swagger documentation using:
 ```bash
 go tool swag init -g cmd/server/main.go -o docs --parseInternal --parseDependency
 ```

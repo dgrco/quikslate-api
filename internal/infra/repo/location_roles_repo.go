@@ -7,13 +7,16 @@ import (
 
 	"github.com/dgrco/quikslate/internal/domain"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 const (
 	assignRoleQuery = `
 		INSERT INTO location_roles (user_id, business_id, location_id, role)
 		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (user_id, location_id) DO UPDATE SET role = EXCLUDED.role, updated_at = NOW()
+		ON CONFLICT (user_id, location_id) DO UPDATE
+			SET role = EXCLUDED.role, updated_at = NOW()
+			WHERE location_roles.business_id = EXCLUDED.business_id
 	`
 	getLocationRoleQuery = `
 		SELECT user_id, business_id, location_id, role, created_at, updated_at
@@ -109,9 +112,15 @@ func scanLocationRoleDetails(rows pgx.Rows) ([]domain.LocationRoleDetail, error)
 // only hold a single role per location, see the (user_id, location_id)
 // conflict target).
 func (r *PgRepository) AssignRole(ctx context.Context, userId, businessId string, locationId string, role domain.LRole) error {
-	_, err := r.exec.Exec(ctx, assignRoleQuery, userId, businessId, locationId, role)
+	cmdTag, err := r.exec.Exec(ctx, assignRoleQuery, userId, businessId, locationId, role)
 	if err != nil {
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == ErrPgForeignKeyConstraintViolation {
+			return domain.ErrNotFound
+		}
 		return fmt.Errorf("failed to assign role: %w", err)
+	}
+	if cmdTag.RowsAffected() == 0 {
+		return domain.ErrNotFound
 	}
 
 	return nil

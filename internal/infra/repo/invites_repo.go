@@ -90,8 +90,12 @@ func (r *PgRepository) CreateInvite(
 ) (domain.Invite, error) {
 	inv, err := scanInvite(r.exec.QueryRow(ctx, createInviteQuery, tokenHash, email, businessId, locationId, role, expiresAt))
 	if err != nil {
-		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == ErrPgUniqueConstraintViolation {
-			return domain.Invite{}, domain.ErrAlreadyExists
+		if pgErr, ok := err.(*pgconn.PgError); ok {
+			if pgErr.Code == ErrPgUniqueConstraintViolation {
+				return domain.Invite{}, domain.ErrAlreadyExists
+			} else if pgErr.Code == ErrPgForeignKeyConstraintViolation {
+				return domain.Invite{}, domain.ErrNotFound
+			}
 		}
 		return domain.Invite{}, fmt.Errorf("failed to create invite: %w", err)
 	}

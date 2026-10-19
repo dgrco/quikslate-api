@@ -62,8 +62,7 @@ func (s *InviteService) CreateInvite(
 	_, err := s.repo.GetPendingInviteByEmailAndBusinessId(ctx, email, businessId)
 	if err == nil {
 		return InviteResult{}, fmt.Errorf("failed to create invite: %w", domain.ErrAlreadyExists)
-	}
-	if !errors.Is(err, domain.ErrNotFound) {
+	} else if !errors.Is(err, domain.ErrNotFound) {
 		return InviteResult{}, fmt.Errorf("failed to create invite: %w", err)
 	}
 
@@ -72,8 +71,7 @@ func (s *InviteService) CreateInvite(
 		if _, err := s.repo.GetBusinessMember(ctx, u.Id, businessId); err == nil {
 			return InviteResult{}, fmt.Errorf("failed to create invite: %w", domain.ErrAlreadyExists)
 		}
-	}
-	if err != nil && !errors.Is(err, domain.ErrNotFound) {
+	} else if !errors.Is(err, domain.ErrNotFound) {
 		return InviteResult{}, fmt.Errorf("failed to create invite: %w", err)
 	}
 

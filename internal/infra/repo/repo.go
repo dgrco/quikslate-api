@@ -16,23 +16,19 @@ type queryExecutor interface {
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Begin(ctx context.Context) (pgx.Tx, error)
 }
 
 type PgRepository struct {
-	pool *pgxpool.Pool
 	exec queryExecutor
 }
 
 func NewPgRepository(pool *pgxpool.Pool) *PgRepository {
-	return &PgRepository{pool, pool}
-}
-
-func (r *PgRepository) beginPgxTx(ctx context.Context) (pgx.Tx, error) {
-	return r.pool.Begin(ctx)
+	return &PgRepository{pool}
 }
 
 func (r *PgRepository) BeginTransaction(ctx context.Context) (domain.Tx, error) {
-	return r.beginPgxTx(ctx)
+	return r.exec.Begin(ctx)
 }
 
 // WithTx panics on a tx that didn't come from BeginTransaction: that can
@@ -42,5 +38,5 @@ func (r *PgRepository) WithTx(tx domain.Tx) domain.Repo {
 	if !ok {
 		panic(fmt.Sprintf("repo.WithTx: domain.Tx of type %T did not originate from PgRepository.BeginTransaction", tx))
 	}
-	return &PgRepository{r.pool, pgxTx}
+	return &PgRepository{pgxTx}
 }
